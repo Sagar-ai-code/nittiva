@@ -36,6 +36,7 @@ PROD_DOMAINS = [
     "www.nittiva.com",
     "172.31.30.71",   # instance private IP (ALB/internal)
     "23.22.100.187",  # instance public IP (direct tests)
+    "nittiva-backend.onrender.com",  # Render deployment URL
 ]
 
 # Local hosts
@@ -48,6 +49,8 @@ CSRF_TRUSTED_ORIGINS = [
     "https://api.nittiva.com",
     "https://nittiva.com",
     "https://www.nittiva.com",
+    "https://nittiva-backend.onrender.com",
+    "https://nittiva-frontend.vercel.app",
     # Local dev (HTTP)
     "http://localhost:8080",
     "http://127.0.0.1:8080",
@@ -208,6 +211,8 @@ CORS_ALLOWED_ORIGINS = [
     "https://nittiva.com",
     "https://www.nittiva.com",
     "https://api.nittiva.com",
+    "https://nittiva-backend.onrender.com",
+    "https://nittiva-frontend.vercel.app",
     # Local dev
     "http://localhost:8080",
     "http://127.0.0.1:8080",
