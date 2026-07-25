@@ -1,0 +1,82 @@
+# Backend - Python/Django
+nittiva-backend/venv/
+nittiva-backend/env/
+nittiva-backend/.venv
+nittiva-backend/__pycache__/
+nittiva-backend/*.py[cod]
+nittiva-backend/*$py.class
+nittiva-backend/*.so
+nittiva-backend/.Python
+nittiva-backend/build/
+nittiva-backend/dist/
+nittiva-backend/*.egg-info/
+nittiva-backend/.installed.cfg
+nittiva-backend/*.egg
+nittiva-backend/*.log
+nittiva-backend/db.sqlite3
+nittiva-backend/db.sqlite3-journal
+nittiva-backend/staticfiles/
+nittiva-backend/media/
+nittiva-backend/.env
+nittiva-backend/.env.local
+nittiva-backend/.env.*.local
+nittiva-backend/htmlcov/
+nittiva-backend/.tox/
+nittiva-backend/.coverage
+nittiva-backend/.coverage.*
+nittiva-backend/.cache
+nittiva-backend/nosetests.xml
+nittiva-backend/coverage.xml
+nittiva-backend/*.cover
+nittiva-backend/.pytest_cache/
+nittiva-backend/.mypy_cache/
+nittiva-backend/.dmypy.json
+nittiva-backend/dmypy.json
+
+# Frontend - Node/React
+Nittiva-main/node_modules/
+Nittiva-main/dist/
+Nittiva-main/.vite/
+Nittiva-main/.env
+Nittiva-main/.env.local
+Nittiva-main/.env.*.local
+Nittiva-main/.DS_Store
+Nittiva-main/.pnpm-debug.log*
+Nittiva-main/.yarn/
+Nittiva-main/.yarn/cache
+Nittiva-main/.yarn/unplugged
+Nittiva-main/.yarn/build-state.yml
+Nittiva-main/.yarn/install-state.gz
+Nittiva-main/.pnp.*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+
+# OS
+Thumbs.db
+.DS_Store
+Desktop.ini
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Testing
+coverage/
+.nyc_output/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
