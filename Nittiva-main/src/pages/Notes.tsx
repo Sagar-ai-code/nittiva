@@ -13,7 +13,6 @@ import {
   Calendar,
   MoreHorizontal,
   Pin,
-  Archive,
   Bookmark,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -38,15 +37,14 @@ import { apiService } from "@/lib/api";
 import { toast } from "sonner";
 
 interface Note {
-  id: number;
+  id: string;
   title: string;
   content: string;
-  task_id?: number;
-  project_id?: number;
+  content_type?: "task" | "project";
+  object_id?: string;
   is_pinned?: boolean;
-  is_archived?: boolean;
   color?: string;
-  tags?: string[];
+  author?: { id: string; email: string; name?: string };
   created_at: string;
   updated_at: string;
 }
@@ -148,7 +146,7 @@ export default function Notes() {
     }
   };
 
-  const handleDeleteNote = async (id: number) => {
+  const handleDeleteNote = async (id: string) => {
     if (!confirm("Are you sure you want to delete this note?")) return;
 
     try {
@@ -221,7 +219,6 @@ export default function Notes() {
   const stats = {
     total: notes.length,
     pinned: notes.filter((n) => n.is_pinned).length,
-    archived: notes.filter((n) => n.is_archived).length,
     recent: notes.filter((n) => {
       const weekAgo = new Date();
       weekAgo.setDate(weekAgo.getDate() - 7);
@@ -389,7 +386,7 @@ export default function Notes() {
         </motion.div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {[
             {
               label: "Total Notes",
@@ -408,12 +405,6 @@ export default function Notes() {
               value: stats.recent,
               color: "green",
               icon: Calendar,
-            },
-            {
-              label: "Archived",
-              value: stats.archived,
-              color: "gray",
-              icon: Archive,
             },
           ].map((stat, index) => (
             <motion.div
@@ -598,7 +589,7 @@ interface NoteCardProps {
   index: number;
   viewMode: "grid" | "list";
   onEdit: (note: Note) => void;
-  onDelete: (id: number) => void;
+  onDelete: (id: string) => void;
   onPin: (note: Note) => void;
   getColorStyle: (color?: string) => any;
   truncateContent: (content: string, maxLength?: number) => string;

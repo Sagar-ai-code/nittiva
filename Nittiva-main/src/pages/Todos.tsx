@@ -45,14 +45,16 @@ import { apiService } from "@/lib/api";
 import { toast } from "sonner";
 
 interface Todo {
-  id: number;
+  id: string;
   title: string;
   description?: string;
-  priority: "low" | "medium" | "high" | "urgent";
-  status: "pending" | "in_progress" | "completed" | "cancelled";
-  due_date?: string;
-  project_id?: number;
-  assigned_to?: number;
+  priority: "low" | "medium" | "high";
+  completed: boolean;
+  completed_at?: string | null;
+  due_date?: string | null;
+  project_id?: string | null;
+  owner?: { id: string; email: string; name?: string };
+  assigned_to?: { id: string; email: string; name?: string } | null;
   created_at: string;
   updated_at: string;
 }
@@ -70,7 +72,6 @@ export default function Todos() {
     title: "",
     description: "",
     priority: "medium" as const,
-    status: "pending" as const,
     due_date: "",
   });
 
@@ -114,7 +115,6 @@ export default function Todos() {
           title: "",
           description: "",
           priority: "medium",
-          status: "pending",
           due_date: "",
         });
         setShowAddDialog(false);
@@ -163,14 +163,10 @@ export default function Todos() {
   };
 
   const handleToggleComplete = async (todo: Todo) => {
-    const newStatus = todo.status === "completed" ? "pending" : "completed";
     try {
-      const response = await apiService.updateTodo(todo.id, {
-        ...todo,
-        status: newStatus,
-      });
+      const response = await apiService.toggleTodo(todo.id);
       if (response.success) {
-        toast.success(`Todo marked as ${newStatus}`);
+        toast.success(todo.completed ? "Todo reopened" : "Todo completed");
         fetchTodos();
       } else {
         toast.error(response.message || "Failed to update todo");
@@ -187,7 +183,9 @@ export default function Todos() {
       (todo.description &&
         todo.description.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesStatus =
-      statusFilter === "all" || todo.status === statusFilter;
+      statusFilter === "all" ||
+      (statusFilter === "completed" && todo.completed) ||
+      (statusFilter === "pending" && !todo.completed);
     const matchesPriority =
       priorityFilter === "all" || todo.priority === priorityFilter;
     return matchesSearch && matchesStatus && matchesPriority;
@@ -208,19 +206,14 @@ export default function Todos() {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "pending":
-        return "bg-blue-500/20 text-blue-400";
-      case "in_progress":
-        return "bg-yellow-500/20 text-yellow-400";
-      case "completed":
-        return "bg-green-500/20 text-green-400";
-      case "cancelled":
-        return "bg-red-500/20 text-red-400";
-      default:
-        return "bg-gray-500/20 text-gray-400";
-    }
+  const getStatusColor = (completed: boolean) => {
+    return completed
+      ? "bg-green-500/20 text-green-400"
+      : "bg-blue-500/20 text-blue-400";
+  };
+
+  const getStatusLabel = (completed: boolean) => {
+    return completed ? "completed" : "pending";
   };
 
   const getPriorityIcon = (priority: string) => {
@@ -249,10 +242,9 @@ export default function Todos() {
 
   const stats = {
     total: todos.length,
-    pending: todos.filter((t) => t.status === "pending").length,
-    in_progress: todos.filter((t) => t.status === "in_progress").length,
-    completed: todos.filter((t) => t.status === "completed").length,
-    overdue: todos.filter((t) => t.due_date && isOverdue(t.due_date)).length,
+    pending: todos.filter((t) => !t.completed).length,
+    completed: todos.filter((t) => t.completed).length,
+    overdue: todos.filter((t) => !t.completed && t.due_date && isOverdue(t.due_date)).length,
   };
 
   return (
@@ -364,25 +356,6 @@ export default function Todos() {
                         <SelectItem value="low">Low</SelectItem>
                         <SelectItem value="medium">Medium</SelectItem>
                         <SelectItem value="high">High</SelectItem>
-                        <SelectItem value="urgent">Urgent</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className="text-sm text-gray-400">Status</Label>
-                    <Select
-                      value={newTodo.status}
-                      onValueChange={(value: any) =>
-                        setNewTodo({ ...newTodo, status: value })
-                      }
-                    >
-                      <SelectTrigger className="bg-dashboard-bg border-dashboard-border text-white">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="in_progress">In Progress</SelectItem>
-                        <SelectItem value="completed">Completed</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -419,11 +392,10 @@ export default function Todos() {
         </motion.div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {[
             { label: "Total", value: stats.total, color: "blue" },
             { label: "Pending", value: stats.pending, color: "yellow" },
-            { label: "In Progress", value: stats.in_progress, color: "blue" },
             { label: "Completed", value: stats.completed, color: "green" },
             { label: "Overdue", value: stats.overdue, color: "red" },
           ].map((stat, index) => (
@@ -451,9 +423,7 @@ export default function Todos() {
             <SelectContent>
               <SelectItem value="all">All Status</SelectItem>
               <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="in_progress">In Progress</SelectItem>
               <SelectItem value="completed">Completed</SelectItem>
-              <SelectItem value="cancelled">Cancelled</SelectItem>
             </SelectContent>
           </Select>
 
@@ -492,7 +462,7 @@ export default function Todos() {
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.3, delay: index * 0.05 }}
                 className={`bg-card border border-dashboard-border rounded-lg p-4 hover:bg-dashboard-surface/50 transition-colors ${
-                  todo.status === "completed" ? "opacity-60" : ""
+                  todo.completed ? "opacity-60" : ""
                 }`}
               >
                 <div className="flex items-start gap-4">
@@ -502,7 +472,7 @@ export default function Todos() {
                     className="p-0 h-auto"
                     onClick={() => handleToggleComplete(todo)}
                   >
-                    {todo.status === "completed" ? (
+                    {todo.completed ? (
                       <CheckCircle className="w-5 h-5 text-green-500" />
                     ) : (
                       <Circle className="w-5 h-5 text-gray-400 hover:text-white" />
@@ -514,7 +484,7 @@ export default function Todos() {
                       <div className="flex-1">
                         <h3
                           className={`text-sm font-medium ${
-                            todo.status === "completed"
+                            todo.completed
                               ? "line-through text-gray-400"
                               : "text-white"
                           }`}
@@ -538,9 +508,9 @@ export default function Todos() {
                           </div>
 
                           <Badge
-                            className={`${getStatusColor(todo.status)} border-0 text-xs capitalize`}
+                            className={`${getStatusColor(todo.completed)} border-0 text-xs capitalize`}
                           >
-                            {todo.status.replace("_", " ")}
+                            {getStatusLabel(todo.completed)}
                           </Badge>
 
                           {todo.due_date && (
@@ -633,45 +603,23 @@ export default function Todos() {
                     rows={3}
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-sm text-gray-400">Priority</Label>
-                    <Select
-                      value={editingTodo.priority}
-                      onValueChange={(value: any) =>
-                        setEditingTodo({ ...editingTodo, priority: value })
-                      }
-                    >
-                      <SelectTrigger className="bg-dashboard-bg border-dashboard-border text-white">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="low">Low</SelectItem>
-                        <SelectItem value="medium">Medium</SelectItem>
-                        <SelectItem value="high">High</SelectItem>
-                        <SelectItem value="urgent">Urgent</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className="text-sm text-gray-400">Status</Label>
-                    <Select
-                      value={editingTodo.status}
-                      onValueChange={(value: any) =>
-                        setEditingTodo({ ...editingTodo, status: value })
-                      }
-                    >
-                      <SelectTrigger className="bg-dashboard-bg border-dashboard-border text-white">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="in_progress">In Progress</SelectItem>
-                        <SelectItem value="completed">Completed</SelectItem>
-                        <SelectItem value="cancelled">Cancelled</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <div>
+                  <Label className="text-sm text-gray-400">Priority</Label>
+                  <Select
+                    value={editingTodo.priority}
+                    onValueChange={(value: any) =>
+                      setEditingTodo({ ...editingTodo, priority: value })
+                    }
+                  >
+                    <SelectTrigger className="bg-dashboard-bg border-dashboard-border text-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
                   <Label className="text-sm text-gray-400">Due Date</Label>

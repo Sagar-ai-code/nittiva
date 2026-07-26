@@ -38,15 +38,17 @@ import { apiService } from "@/lib/api";
 import { toast } from "sonner";
 
 interface Meeting {
-  id: number;
+  id: string;
   title: string;
   description?: string;
   start_time: string;
   end_time: string;
   location?: string;
   meeting_url?: string;
-  participants: string[];
-  status: "scheduled" | "ongoing" | "completed" | "cancelled";
+  participants: Array<{ id: string; email: string; name?: string }>;
+  status: "scheduled" | "in_progress" | "completed" | "cancelled";
+  organizer?: { id: string; email: string; name?: string };
+  project_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -172,7 +174,7 @@ export default function Meetings() {
     switch (status) {
       case "scheduled":
         return "bg-blue-500/20 text-blue-400";
-      case "ongoing":
+      case "in_progress":
         return "bg-green-500/20 text-green-400";
       case "completed":
         return "bg-gray-500/20 text-gray-400";
