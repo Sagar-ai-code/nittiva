@@ -112,9 +112,10 @@ class TenantMiddleware(MiddlewareMixin):
                 except Tenant.DoesNotExist:
                     tenant = None
 
-        # Superuser safety net: if still no tenant, create/use a default tenant.
-        # This keeps admin/demo accounts usable when no subdomain/company_id is sent.
-        if not tenant and hasattr(request, 'user') and request.user.is_authenticated and request.user.is_superuser:
+        # Safety net: if still no tenant, create/use a default tenant.
+        # This keeps the app usable when requests come without a subdomain or
+        # X-Company-ID header (e.g. admin/demo access from the deployed frontend).
+        if not tenant:
             tenant, created = Tenant.objects.get_or_create(
                 subdomain='default',
                 defaults={
@@ -125,11 +126,6 @@ class TenantMiddleware(MiddlewareMixin):
             )
             if tenant and not company_id:
                 company_id = tenant.company_id
-            # Also link the superuser to this tenant so non-superuser fallback works later
-            user = request.user
-            if hasattr(user, 'tenant_id') and not user.tenant_id:
-                user.tenant_id = tenant.id
-                user.save(update_fields=['tenant_id'])
 
         # Attach tenant to request
         request.tenant = tenant
