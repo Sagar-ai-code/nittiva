@@ -264,7 +264,8 @@ class ApiService {
     const headers: HeadersInit = {
       "Content-Type": "application/json",
       Accept: "application/json",
-      workspace_id: "1", // Required workspace_id header
+      // NOTE: backend has no /workspaces model yet — workspace_id header removed.
+      // See NITTIVA_AUDIT.md §3. Re-add when backend has a Workspace concept.
       ...(token && { Authorization: `Bearer ${token}` }),
     };
     
@@ -1130,29 +1131,8 @@ async deleteProject(id: number): Promise<ApiResponse<any>> {
   });
 }
 
-  // Status Management
-  async getStatuses(): Promise<ApiResponse<any[]>> {
-    return this.makeRequest<any[]>("/statuses");
-  }
-
-  async createStatus(status: any): Promise<ApiResponse<any>> {
-    return this.makeRequest<any>("/status/store", {
-      method: "POST",
-      body: JSON.stringify(status),
-    });
-  }
-
-  // Priority Management
-  async getPriorities(): Promise<ApiResponse<any[]>> {
-    return this.makeRequest<any[]>("/priorities");
-  }
-
-  async createPriority(priority: any): Promise<ApiResponse<any>> {
-    return this.makeRequest<any>("/priority/store", {
-      method: "POST",
-      body: JSON.stringify(priority),
-    });
-  }
+  // Status Management - see getTaskStatuses / createTaskStatus below
+  // Priority Management - see getTaskPriorities / createTaskPriority below
 
   // Notes Management
   async getNotes(): Promise<ApiResponse<Note[]>> {
