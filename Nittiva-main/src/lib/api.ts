@@ -1488,6 +1488,110 @@ async deleteNotification(id: string | number): Promise<ApiResponse<any>> {
     method: "DELETE",
   });
 }
+
+  // ----------------------------------------------------------------
+  // Chat — backed by ChatRoomViewSet + ChatMessageViewSet
+  // ----------------------------------------------------------------
+  async getChatRooms(): Promise<ApiResponse<any[]>> {
+    return this.makeRequest<any[]>(`/chat/rooms/`);
+  }
+
+  async getChatRoom(id: string | number): Promise<ApiResponse<any>> {
+    return this.makeRequest<any>(`/chat/rooms/${id}/`);
+  }
+
+  async createChatRoom(room: { name?: string; is_group?: boolean; participant_ids?: string[] }): Promise<ApiResponse<any>> {
+    return this.makeRequest<any>(`/chat/rooms/`, {
+      method: "POST",
+      body: JSON.stringify(room),
+    });
+  }
+
+  async updateChatRoom(id: string | number, room: any): Promise<ApiResponse<any>> {
+    return this.makeRequest<any>(`/chat/rooms/${id}/`, {
+      method: "PATCH",
+      body: JSON.stringify(room),
+    });
+  }
+
+  async deleteChatRoom(id: string | number): Promise<ApiResponse<any>> {
+    return this.makeRequest<any>(`/chat/rooms/${id}/`, { method: "DELETE" });
+  }
+
+  async getChatMessages(roomId: string | number): Promise<ApiResponse<any[]>> {
+    return this.makeRequest<any[]>(`/chat/rooms/${roomId}/messages/`);
+  }
+
+  async sendChatMessage(roomId: string | number, content: string): Promise<ApiResponse<any>> {
+    return this.makeRequest<any>(`/chat/rooms/${roomId}/send/`, {
+      method: "POST",
+      body: JSON.stringify({ content }),
+    });
+  }
+
+  async markChatRoomRead(roomId: string | number): Promise<ApiResponse<any>> {
+    return this.makeRequest<any>(`/chat/rooms/${roomId}/mark_read/`, { method: "POST" });
+  }
+
+  // ----------------------------------------------------------------
+  // Invoices — backed by InvoiceViewSet (also provides /pdf/ action)
+  // ----------------------------------------------------------------
+  async getInvoices(params?: { status?: string; client?: string }): Promise<ApiResponse<any[]>> {
+    const sp = new URLSearchParams();
+    if (params?.status) sp.append("status", params.status);
+    if (params?.client) sp.append("client", params.client);
+    const qs = sp.toString();
+    return this.makeRequest<any[]>(`/invoices/${qs ? `?${qs}` : ""}`);
+  }
+
+  async getInvoice(id: string | number): Promise<ApiResponse<any>> {
+    return this.makeRequest<any>(`/invoices/${id}/`);
+  }
+
+  async createInvoice(invoice: any): Promise<ApiResponse<any>> {
+    return this.makeRequest<any>(`/invoices/`, {
+      method: "POST",
+      body: JSON.stringify(invoice),
+    });
+  }
+
+  async updateInvoice(id: string | number, invoice: any): Promise<ApiResponse<any>> {
+    return this.makeRequest<any>(`/invoices/${id}/`, {
+      method: "PATCH",
+      body: JSON.stringify(invoice),
+    });
+  }
+
+  async deleteInvoice(id: string | number): Promise<ApiResponse<any>> {
+    return this.makeRequest<any>(`/invoices/${id}/`, { method: "DELETE" });
+  }
+
+  async markInvoicePaid(id: string | number): Promise<ApiResponse<any>> {
+    return this.makeRequest<any>(`/invoices/${id}/mark_paid/`, { method: "POST" });
+  }
+
+  async markInvoiceSent(id: string | number): Promise<ApiResponse<any>> {
+    return this.makeRequest<any>(`/invoices/${id}/mark_sent/`, { method: "POST" });
+  }
+
+  /**
+   * Returns the PDF blob for an invoice. Caller is responsible for
+   * triggering a browser download (e.g. `URL.createObjectURL(blob)` + `<a download>`).
+   */
+  async downloadInvoicePdf(id: string | number): Promise<Blob | null> {
+    const token = localStorage.getItem("auth_token");
+    try {
+      const res = await fetch(`${API_BASE_URL}/invoices/${id}/pdf/`, {
+        method: "GET",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: "omit",
+      });
+      if (!res.ok) return null;
+      return await res.blob();
+    } catch {
+      return null;
+    }
+  }
   // Clients
   async getClients(): Promise<ApiResponse<any[]>> {
     return this.makeRequest<any[]>("/clients");

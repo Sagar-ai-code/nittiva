@@ -25,6 +25,8 @@ from .todo import TodoViewSet
 from .meeting import MeetingViewSet
 from .leave_request import LeaveRequestViewSet
 from .notification import NotificationViewSet
+from .chat import ChatRoomViewSet, ChatMessageViewSet
+from .invoice import InvoiceViewSet
 
 __all__ = [
     "LoginView",
@@ -57,5 +59,8 @@ __all__ = [
     "MeetingViewSet",
     "LeaveRequestViewSet",
     "NotificationViewSet",
+    "ChatRoomViewSet",
+    "ChatMessageViewSet",
+    "InvoiceViewSet",
 ]
 

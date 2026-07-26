@@ -22,6 +22,8 @@ from .todo import Todo
 from .meeting import Meeting
 from .leave_request import LeaveRequest
 from .notification import Notification
+from .chat import ChatRoom, ChatRoomMembership, ChatMessage
+from .invoice import Invoice, InvoiceLineItem
 
 __all__ = [
     "Tenant",
@@ -48,5 +50,10 @@ __all__ = [
     "Meeting",
     "LeaveRequest",
     "Notification",
+    "ChatRoom",
+    "ChatRoomMembership",
+    "ChatMessage",
+    "Invoice",
+    "InvoiceLineItem",
 ]
 

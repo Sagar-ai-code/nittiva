@@ -33,6 +33,9 @@ from ..views import (
     MeetingViewSet,
     LeaveRequestViewSet,
     NotificationViewSet,
+    ChatRoomViewSet,
+    ChatMessageViewSet,
+    InvoiceViewSet,
     healthz,
     readyz,
     invite_user_to_project,
@@ -61,6 +64,9 @@ router.register(r'todos', TodoViewSet, basename='todo')
 router.register(r'meetings', MeetingViewSet, basename='meeting')
 router.register(r'leave-requests', LeaveRequestViewSet, basename='leave-request')
 router.register(r'notifications', NotificationViewSet, basename='notification')
+router.register(r'chat/rooms', ChatRoomViewSet, basename='chat-room')
+router.register(r'chat/messages', ChatMessageViewSet, basename='chat-message')
+router.register(r'invoices', InvoiceViewSet, basename='invoice')
 
 # Main URL patterns
 urlpatterns = [

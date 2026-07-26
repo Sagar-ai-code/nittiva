@@ -23,6 +23,8 @@ from .todo import TodoSerializer
 from .meeting import MeetingSerializer
 from .leave_request import LeaveRequestSerializer
 from .notification import NotificationSerializer
+from .chat import ChatRoomSerializer, ChatMessageSerializer
+from .invoice import InvoiceSerializer, InvoiceLineItemSerializer
 
 __all__ = [
     "RegisterSerializer",
@@ -56,5 +58,9 @@ __all__ = [
     "MeetingSerializer",
     "LeaveRequestSerializer",
     "NotificationSerializer",
+    "ChatRoomSerializer",
+    "ChatMessageSerializer",
+    "InvoiceSerializer",
+    "InvoiceLineItemSerializer",
 ]
 
