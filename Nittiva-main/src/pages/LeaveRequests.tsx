@@ -46,18 +46,17 @@ import { apiService } from "@/lib/api";
 import { toast } from "sonner";
 
 interface LeaveRequest {
-  id: number;
-  user_id: number;
-  user_name?: string;
-  leave_type: "annual" | "sick" | "personal" | "maternity" | "emergency";
+  id: string;
+  requester?: { id: string; email: string; name?: string };
+  approver?: { id: string; email: string; name?: string } | null;
+  leave_type: "annual" | "sick" | "personal" | "maternity" | "emergency" | "unpaid";
   start_date: string;
   end_date: string;
   days_count: number;
   reason: string;
   status: "pending" | "approved" | "rejected" | "cancelled";
-  approved_by?: number;
-  approved_at?: string;
-  comments?: string;
+  approver_comments?: string;
+  decided_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -148,11 +147,9 @@ export default function LeaveRequests() {
     }
   };
 
-  const handleApproveRequest = async (id: number) => {
+  const handleApproveRequest = async (id: string) => {
     try {
-      const response = await apiService.updateLeaveRequest(id, {
-        status: "approved",
-      });
+      const response = await apiService.approveLeaveRequest(id);
       if (response.success) {
         toast.success("Leave request approved");
         fetchLeaveRequests();
@@ -165,15 +162,12 @@ export default function LeaveRequests() {
     }
   };
 
-  const handleRejectRequest = async (id: number) => {
+  const handleRejectRequest = async (id: string) => {
     const reason = prompt("Please provide a reason for rejection:");
     if (!reason) return;
 
     try {
-      const response = await apiService.updateLeaveRequest(id, {
-        status: "rejected",
-        comments: reason,
-      });
+      const response = await apiService.rejectLeaveRequest(id, reason);
       if (response.success) {
         toast.success("Leave request rejected");
         fetchLeaveRequests();
@@ -186,7 +180,7 @@ export default function LeaveRequests() {
     }
   };
 
-  const handleDeleteRequest = async (id: number) => {
+  const handleDeleteRequest = async (id: string) => {
     if (!confirm("Are you sure you want to delete this leave request?")) return;
 
     try {
@@ -204,9 +198,9 @@ export default function LeaveRequests() {
   };
 
   const filteredRequests = leaveRequests.filter((request) => {
+    const requesterName = request.requester?.name || request.requester?.email || "";
     const matchesSearch =
-      (request.user_name &&
-        request.user_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      requesterName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       request.reason.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus =
       statusFilter === "all" || request.status === statusFilter;
@@ -551,7 +545,7 @@ export default function LeaveRequests() {
                           </div>
                           <div>
                             <div className="text-sm font-medium text-white">
-                              {request.user_name || `User ${request.user_id}`}
+                              {request.requester?.name || request.requester?.email || "Unknown user"}
                             </div>
                             <div className="text-xs text-gray-400 max-w-xs truncate">
                               {request.reason}

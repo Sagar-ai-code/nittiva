@@ -21,6 +21,8 @@ from .task_status import TaskStatusSerializer, TaskPrioritySerializer
 from .note import NoteSerializer
 from .todo import TodoSerializer
 from .meeting import MeetingSerializer
+from .leave_request import LeaveRequestSerializer
+from .notification import NotificationSerializer
 
 __all__ = [
     "RegisterSerializer",
@@ -52,5 +54,7 @@ __all__ = [
     "NoteSerializer",
     "TodoSerializer",
     "MeetingSerializer",
+    "LeaveRequestSerializer",
+    "NotificationSerializer",
 ]
 

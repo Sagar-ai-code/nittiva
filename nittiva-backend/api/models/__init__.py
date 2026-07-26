@@ -20,6 +20,8 @@ from .task_status import TaskStatus, TaskPriority
 from .note import Note
 from .todo import Todo
 from .meeting import Meeting
+from .leave_request import LeaveRequest
+from .notification import Notification
 
 __all__ = [
     "Tenant",
@@ -44,5 +46,7 @@ __all__ = [
     "Note",
     "Todo",
     "Meeting",
+    "LeaveRequest",
+    "Notification",
 ]
 

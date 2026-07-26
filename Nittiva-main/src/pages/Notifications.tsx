@@ -39,12 +39,14 @@ import { apiService } from "@/lib/api";
 import { toast } from "sonner";
 
 interface Notification {
-  id: number;
+  id: string;
   title: string;
   message: string;
   type: "info" | "success" | "warning" | "error";
   is_read: boolean;
-  data?: any;
+  read_at?: string | null;
+  link?: string;
+  recipient?: { id: string; email: string; name?: string };
   created_at: string;
   updated_at: string;
 }
@@ -82,7 +84,7 @@ export default function Notifications() {
     }
   };
 
-  const handleMarkAsRead = async (id: number) => {
+  const handleMarkAsRead = async (id: string) => {
     try {
       const response = await apiService.markNotificationAsRead(id);
       if (response.success) {
@@ -102,24 +104,23 @@ export default function Notifications() {
   };
 
   const handleMarkAllAsRead = async () => {
-    const unreadNotifications = notifications.filter((n) => !n.is_read);
-
     try {
-      for (const notification of unreadNotifications) {
-        await apiService.markNotificationAsRead(notification.id);
+      const response = await apiService.markAllNotificationsAsRead();
+      if (response.success) {
+        setNotifications((prev) =>
+          prev.map((notif) => ({ ...notif, is_read: true })),
+        );
+        toast.success("All notifications marked as read");
+      } else {
+        toast.error(response.message || "Failed to mark all as read");
       }
-
-      setNotifications((prev) =>
-        prev.map((notif) => ({ ...notif, is_read: true })),
-      );
-      toast.success("All notifications marked as read");
     } catch (error) {
       toast.error("Failed to mark all as read");
-      console.error("Error marking all as read:", error);
+      console.error("Error marking all notifications as read:", error);
     }
   };
 
-  const handleDeleteNotification = async (id: number) => {
+  const handleDeleteNotification = async (id: string) => {
     if (!confirm("Are you sure you want to delete this notification?")) return;
 
     try {

@@ -1371,31 +1371,60 @@ async deleteProject(id: number): Promise<ApiResponse<any>> {
     return this.makeRequest<SupportTicket>(`/tickets/${id}`);
   }
 
-  // Leave Requests
-  async getLeaveRequests(): Promise<ApiResponse<any[]>> {
-    return this.makeRequest<any[]>("/leave-requests");
+  // Leave Requests — RESTful, backed by LeaveRequestViewSet at /api/leave-requests/
+  async getLeaveRequests(params?: { status?: string; leave_type?: string; requester?: string }): Promise<ApiResponse<any[]>> {
+    const sp = new URLSearchParams();
+    if (params?.status) sp.append("status", params.status);
+    if (params?.leave_type) sp.append("leave_type", params.leave_type);
+    if (params?.requester) sp.append("requester", params.requester);
+    const qs = sp.toString();
+    return this.makeRequest<any[]>(`/leave-requests/${qs ? `?${qs}` : ""}`);
+  }
+
+  async getLeaveRequest(id: string | number): Promise<ApiResponse<any>> {
+    return this.makeRequest<any>(`/leave-requests/${id}/`);
   }
 
   async createLeaveRequest(request: any): Promise<ApiResponse<any>> {
-    return this.makeRequest<any>("/leave-requests/store", {
+    return this.makeRequest<any>("/leave-requests/", {
       method: "POST",
       body: JSON.stringify(request),
     });
   }
 
   async updateLeaveRequest(
-    id: number,
+    id: string | number,
     request: any,
   ): Promise<ApiResponse<any>> {
-    return this.makeRequest<any>("/leave-requests/update", {
-      method: "POST",
-      body: JSON.stringify({ id, ...request }),
+    return this.makeRequest<any>(`/leave-requests/${id}/`, {
+      method: "PATCH",
+      body: JSON.stringify(request),
     });
   }
 
-  async deleteLeaveRequest(id: number): Promise<ApiResponse<any>> {
-    return this.makeRequest<any>(`/leave-requests/destroy/${id}`, {
+  async deleteLeaveRequest(id: string | number): Promise<ApiResponse<any>> {
+    return this.makeRequest<any>(`/leave-requests/${id}/`, {
       method: "DELETE",
+    });
+  }
+
+  async approveLeaveRequest(id: string | number, comments?: string): Promise<ApiResponse<any>> {
+    return this.makeRequest<any>(`/leave-requests/${id}/approve/`, {
+      method: "POST",
+      body: JSON.stringify({ comments: comments || "" }),
+    });
+  }
+
+  async rejectLeaveRequest(id: string | number, comments?: string): Promise<ApiResponse<any>> {
+    return this.makeRequest<any>(`/leave-requests/${id}/reject/`, {
+      method: "POST",
+      body: JSON.stringify({ comments: comments || "" }),
+    });
+  }
+
+  async cancelLeaveRequest(id: string | number): Promise<ApiResponse<any>> {
+    return this.makeRequest<any>(`/leave-requests/${id}/cancel/`, {
+      method: "POST",
     });
   }
 
@@ -1416,44 +1445,47 @@ async getNotificationTypes(): Promise<ApiResponse<any[]>> {
   return this.makeRequest<any[]>("/notifications/types");
 }
 
-async listNotifications(): Promise<ApiResponse<any[]>> {
-  return this.makeRequest<any[]>("/notifications");
+async getNotifications(params?: { unread?: boolean; type?: string }): Promise<ApiResponse<any[]>> {
+  const sp = new URLSearchParams();
+  if (params?.unread) sp.append("unread", "true");
+  if (params?.type) sp.append("type", params.type);
+  const qs = sp.toString();
+  return this.makeRequest<any[]>(`/notifications/${qs ? `?${qs}` : ""}`);
+}
+
+// Backwards-compat alias used by the existing Notifications.tsx page
+async listNotifications(params?: { unread?: boolean; type?: string }): Promise<ApiResponse<any[]>> {
+  return this.getNotifications(params);
 }
 
 async getUnreadNotificationsCount(): Promise<ApiResponse<{ count: number }>> {
-  return this.makeRequest<{ count: number }>("/unread-notifications");
+  return this.makeRequest<{ count: number }>(`/notifications/unread_count/`);
 }
 
 async getNotificationUrl(id: number): Promise<ApiResponse<{ url: string }>> {
   return this.makeRequest<{ url: string }>(`/notifications/${id}/url`);
 }
 
-async markAllAsRead(): Promise<ApiResponse<any>> {
-  return this.makeRequest<any>("/notifications/mark-as-read", {
+async markNotificationAsRead(id: string | number): Promise<ApiResponse<any>> {
+  return this.makeRequest<any>(`/notifications/${id}/mark_read/`, {
     method: "POST",
   });
 }
 
-async updateNotificationStatus(
-  id: number,
-  status: string
-): Promise<ApiResponse<any>> {
-  return this.makeRequest<any>(`/notifications/${id}/status`, {
-    method: "PATCH",
-    body: JSON.stringify({ status }),
+async markAllNotificationsAsRead(): Promise<ApiResponse<any>> {
+  return this.makeRequest<any>(`/notifications/mark_all_read/`, {
+    method: "POST",
   });
 }
 
-async deleteNotification(id: number): Promise<ApiResponse<any>> {
-  return this.makeRequest<any>(`/notifications/destroy/${id}`, {
-    method: "DELETE",
-  });
+// Backwards-compat alias for the old markAllAsRead name
+async markAllAsRead(): Promise<ApiResponse<any>> {
+  return this.markAllNotificationsAsRead();
 }
 
-async deleteMultipleNotifications(ids: number[]): Promise<ApiResponse<any>> {
-  return this.makeRequest<any>("/notifications", {
+async deleteNotification(id: string | number): Promise<ApiResponse<any>> {
+  return this.makeRequest<any>(`/notifications/${id}/`, {
     method: "DELETE",
-    body: JSON.stringify({ ids }),
   });
 }
   // Clients

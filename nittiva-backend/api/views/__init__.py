@@ -23,6 +23,8 @@ from .task_status import TaskStatusViewSet, TaskPriorityViewSet
 from .note import NoteViewSet
 from .todo import TodoViewSet
 from .meeting import MeetingViewSet
+from .leave_request import LeaveRequestViewSet
+from .notification import NotificationViewSet
 
 __all__ = [
     "LoginView",
@@ -53,5 +55,7 @@ __all__ = [
     "NoteViewSet",
     "TodoViewSet",
     "MeetingViewSet",
+    "LeaveRequestViewSet",
+    "NotificationViewSet",
 ]
 

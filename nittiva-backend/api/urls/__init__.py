@@ -31,6 +31,8 @@ from ..views import (
     NoteViewSet,
     TodoViewSet,
     MeetingViewSet,
+    LeaveRequestViewSet,
+    NotificationViewSet,
     healthz,
     readyz,
     invite_user_to_project,
@@ -57,6 +59,8 @@ router.register(r'task-priorities', TaskPriorityViewSet, basename='task-priority
 router.register(r'notes', NoteViewSet, basename='note')
 router.register(r'todos', TodoViewSet, basename='todo')
 router.register(r'meetings', MeetingViewSet, basename='meeting')
+router.register(r'leave-requests', LeaveRequestViewSet, basename='leave-request')
+router.register(r'notifications', NotificationViewSet, basename='notification')
 
 # Main URL patterns
 urlpatterns = [
