@@ -28,6 +28,9 @@ from ..views import (
     SprintViewSet,
     TaskStatusViewSet,
     TaskPriorityViewSet,
+    NoteViewSet,
+    TodoViewSet,
+    MeetingViewSet,
     healthz,
     readyz,
     invite_user_to_project,
@@ -51,6 +54,9 @@ router.register(r'custom-fields', CustomFieldViewSet, basename='custom-field')
 router.register(r'sprints', SprintViewSet, basename='sprint')
 router.register(r'task-statuses', TaskStatusViewSet, basename='task-status')
 router.register(r'task-priorities', TaskPriorityViewSet, basename='task-priority')
+router.register(r'notes', NoteViewSet, basename='note')
+router.register(r'todos', TodoViewSet, basename='todo')
+router.register(r'meetings', MeetingViewSet, basename='meeting')
 
 # Main URL patterns
 urlpatterns = [

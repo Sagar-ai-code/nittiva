@@ -20,6 +20,9 @@ from .time_log import TimeLogViewSet
 from .custom_field import CustomFieldViewSet
 from .sprint import SprintViewSet
 from .task_status import TaskStatusViewSet, TaskPriorityViewSet
+from .note import NoteViewSet
+from .todo import TodoViewSet
+from .meeting import MeetingViewSet
 
 __all__ = [
     "LoginView",
@@ -47,5 +50,8 @@ __all__ = [
     "SprintViewSet",
     "TaskStatusViewSet",
     "TaskPriorityViewSet",
+    "NoteViewSet",
+    "TodoViewSet",
+    "MeetingViewSet",
 ]
 

@@ -17,6 +17,9 @@ from .time_log import TimeLog
 from .custom_field import CustomField
 from .sprint import Sprint, SprintMember
 from .task_status import TaskStatus, TaskPriority
+from .note import Note
+from .todo import Todo
+from .meeting import Meeting
 
 __all__ = [
     "Tenant",
@@ -38,5 +41,8 @@ __all__ = [
     "SprintMember",
     "TaskStatus",
     "TaskPriority",
+    "Note",
+    "Todo",
+    "Meeting",
 ]
 

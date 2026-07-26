@@ -1134,88 +1134,124 @@ async deleteProject(id: number): Promise<ApiResponse<any>> {
   // Status Management - see getTaskStatuses / createTaskStatus below
   // Priority Management - see getTaskPriorities / createTaskPriority below
 
-  // Notes Management
-  async getNotes(): Promise<ApiResponse<Note[]>> {
-    return this.makeRequest<Note[]>("/notes");
+  // Notes Management — RESTful, backed by NoteViewSet at /api/notes/
+  async getNotes(params?: { content_type?: string; object_id?: string }): Promise<ApiResponse<Note[]>> {
+    const qs = params?.content_type && params?.object_id
+      ? `?content_type=${encodeURIComponent(params.content_type)}&object_id=${encodeURIComponent(params.object_id)}`
+      : "";
+    return this.makeRequest<Note[]>(`/notes/${qs}`);
+  }
+
+  async getNote(id: string | number): Promise<ApiResponse<Note>> {
+    return this.makeRequest<Note>(`/notes/${id}/`);
   }
 
   async createNote(note: Partial<Note>): Promise<ApiResponse<Note>> {
-    return this.makeRequest<Note>("/notes/store", {
+    return this.makeRequest<Note>("/notes/", {
       method: "POST",
       body: JSON.stringify(note),
     });
   }
 
   async updateNote(
-    id: number,
+    id: string | number,
     note: Partial<Note>,
   ): Promise<ApiResponse<Note>> {
-    return this.makeRequest<Note>("/notes/update", {
-      method: "PUT",
-      body: JSON.stringify({ id, ...note }),
+    return this.makeRequest<Note>(`/notes/${id}/`, {
+      method: "PATCH",
+      body: JSON.stringify(note),
     });
   }
 
-  async deleteNote(id: number): Promise<ApiResponse<any>> {
-    return this.makeRequest<any>("/notes/destroy", {
+  async deleteNote(id: string | number): Promise<ApiResponse<any>> {
+    return this.makeRequest<any>(`/notes/${id}/`, {
       method: "DELETE",
-      body: JSON.stringify({ id }),
     });
   }
 
-  // Meetings Management
-  async getMeetings(): Promise<ApiResponse<Meeting[]>> {
-    return this.makeRequest<Meeting[]>("/meetings");
+  // Meetings Management — RESTful, backed by MeetingViewSet at /api/meetings/
+  async getMeetings(params?: { status?: string; start_from?: string; start_to?: string; project?: string; participant?: string }): Promise<ApiResponse<Meeting[]>> {
+    const sp = new URLSearchParams();
+    if (params?.status) sp.append("status", params.status);
+    if (params?.start_from) sp.append("start_from", params.start_from);
+    if (params?.start_to) sp.append("start_to", params.start_to);
+    if (params?.project) sp.append("project", params.project);
+    if (params?.participant) sp.append("participant", params.participant);
+    const qs = sp.toString();
+    return this.makeRequest<Meeting[]>(`/meetings/${qs ? `?${qs}` : ""}`);
   }
 
-  async createMeeting(
-    meeting: Partial<Meeting>,
-  ): Promise<ApiResponse<Meeting>> {
-    return this.makeRequest<Meeting>("/meetings/store", {
+  async getMeeting(id: string | number): Promise<ApiResponse<Meeting>> {
+    return this.makeRequest<Meeting>(`/meetings/${id}/`);
+  }
+
+  async createMeeting(meeting: Partial<Meeting>): Promise<ApiResponse<Meeting>> {
+    return this.makeRequest<Meeting>("/meetings/", {
       method: "POST",
       body: JSON.stringify(meeting),
     });
   }
 
   async updateMeeting(
-    id: number,
+    id: string | number,
     meeting: Partial<Meeting>,
   ): Promise<ApiResponse<Meeting>> {
-    return this.makeRequest<Meeting>("/meetings/update", {
-      method: "PUT",
-      body: JSON.stringify({ id, ...meeting }),
+    return this.makeRequest<Meeting>(`/meetings/${id}/`, {
+      method: "PATCH",
+      body: JSON.stringify(meeting),
     });
   }
 
-  async deleteMeeting(id: number): Promise<ApiResponse<any>> {
-    return this.makeRequest<any>("/meetings/destroy", {
+  async deleteMeeting(id: string | number): Promise<ApiResponse<any>> {
+    return this.makeRequest<any>(`/meetings/${id}/`, {
       method: "DELETE",
-      body: JSON.stringify({ id }),
     });
   }
 
-  // Todos Management - matching documentation
-  async getTodos(): Promise<ApiResponse<Todo[]>> {
-    return this.makeRequest<Todo[]>("/todos");
+  async cancelMeeting(id: string | number): Promise<ApiResponse<Meeting>> {
+    return this.makeRequest<Meeting>(`/meetings/${id}/cancel/`, {
+      method: "POST",
+    });
+  }
+
+  // Todos Management — RESTful, backed by TodoViewSet at /api/todos/
+  async getTodos(params?: { completed?: boolean; owner?: string; assigned_to?: string; project?: string }): Promise<ApiResponse<Todo[]>> {
+    const sp = new URLSearchParams();
+    if (params?.completed !== undefined) sp.append("completed", String(params.completed));
+    if (params?.owner) sp.append("owner", params.owner);
+    if (params?.assigned_to) sp.append("assigned_to", params.assigned_to);
+    if (params?.project) sp.append("project", params.project);
+    const qs = sp.toString();
+    return this.makeRequest<Todo[]>(`/todos/${qs ? `?${qs}` : ""}`);
+  }
+
+  async getTodo(id: string | number): Promise<ApiResponse<Todo>> {
+    return this.makeRequest<Todo>(`/todos/${id}/`);
   }
 
   async createTodo(todo: Partial<Todo>): Promise<ApiResponse<Todo>> {
-    return this.makeRequest<Todo>("/todos", {
+    return this.makeRequest<Todo>("/todos/", {
       method: "POST",
       body: JSON.stringify(todo),
     });
   }
 
-  async updateTodo(id: number, todo: Partial<Todo>): Promise<ApiResponse<Todo>> {
-    return this.makeRequest<Todo>("/todos", {
-      method: "PUT",
-      body: JSON.stringify({ id, ...todo }),
+  async updateTodo(id: string | number, todo: Partial<Todo>): Promise<ApiResponse<Todo>> {
+    return this.makeRequest<Todo>(`/todos/${id}/`, {
+      method: "PATCH",
+      body: JSON.stringify(todo),
     });
   }
 
-  async deleteTodo(id: number): Promise<ApiResponse<any>> {
-    return this.makeRequest<any>(`/todos/${id}`, {
+  async deleteTodo(id: string | number): Promise<ApiResponse<any>> {
+    return this.makeRequest<any>(`/todos/${id}/`, {
       method: "DELETE",
+    });
+  }
+
+  async toggleTodo(id: string | number): Promise<ApiResponse<Todo>> {
+    return this.makeRequest<Todo>(`/todos/${id}/toggle/`, {
+      method: "POST",
     });
   }
 

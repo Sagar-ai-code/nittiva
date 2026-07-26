@@ -18,6 +18,9 @@ from .time_log import TimeLogSerializer
 from .custom_field import CustomFieldSerializer
 from .sprint import SprintSerializer, SprintDetailSerializer, SprintSummarySerializer, SprintMemberSerializer
 from .task_status import TaskStatusSerializer, TaskPrioritySerializer
+from .note import NoteSerializer
+from .todo import TodoSerializer
+from .meeting import MeetingSerializer
 
 __all__ = [
     "RegisterSerializer",
@@ -46,5 +49,8 @@ __all__ = [
     "SprintMemberSerializer",
     "TaskStatusSerializer",
     "TaskPrioritySerializer",
+    "NoteSerializer",
+    "TodoSerializer",
+    "MeetingSerializer",
 ]
 
