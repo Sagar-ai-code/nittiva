@@ -1117,9 +1117,9 @@ async updateTask(
     id: number,
     project: Partial<Project>,
   ): Promise<ApiResponse<Project>> {
-    return this.makeRequest<Project>("/projects/update", {
-      method: "PUT",
-      body: JSON.stringify({ id, ...project }),
+    return this.makeRequest<Project>(`/projects/${id}/`, {
+      method: "PATCH",
+      body: JSON.stringify(project),
     });
   }
 

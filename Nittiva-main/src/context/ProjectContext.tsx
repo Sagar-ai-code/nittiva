@@ -9,7 +9,8 @@ export type Project = {
   color?: string;
   taskCount?: number;
   status?: string;
-  // add anything else you show in the sidebar card
+  description?: string;
+  createdAt?: string;
 };
 
 type ProjectCtx = {
@@ -21,7 +22,8 @@ type ProjectCtx = {
   // actions
   reloadProjects: () => Promise<void>;
   selectProject: (projectOrId: string | Project) => void;
-  addProject: (name: string) => Promise<Project | null>;
+  addProject: (project: string | Partial<Omit<Project, "id">>) => Promise<Project | null>;
+  updateProject: (id: string, updates: Partial<Project>) => Promise<Project | null>;
   deleteProject: (id: string) => Promise<void>;
 };
 
@@ -49,6 +51,8 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
         color: p.color || "#BEFCA9",
         taskCount: p.task_count ?? p.taskCount ?? 0,
         status: p.status ?? "to-do",
+        description: p.description ?? "",
+        createdAt: p.created_at ?? p.createdAt,
       }));
 
       setProjects(normalized);
@@ -80,9 +84,10 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     if (found) setCurrentProject(found);
   };
 
-  const addProject = async (name: string) => {
+  const addProject = async (project: string | Partial<Omit<Project, "id">>) => {
     try {
-      const res = await apiService.createProject({ name }); // POST /api/projects/
+      const payload = typeof project === "string" ? { name: project } : project;
+      const res = await apiService.createProject(payload); // POST /api/projects/
       if (!res.success || !res.data) throw new Error(res.message || "Failed to create project");
 
       const created: Project = {
@@ -91,6 +96,8 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
         color: res.data.color || "#BEFCA9",
         taskCount: res.data.task_count ?? 0,
         status: res.data.status ?? "to-do",
+        description: res.data.description ?? "",
+        createdAt: res.data.created_at ?? res.data.createdAt,
       };
 
       setProjects(prev => [created, ...prev]);
@@ -98,6 +105,30 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
       return created;
     } catch (e) {
       console.error("addProject error:", e);
+      return null;
+    }
+  };
+
+  const updateProject = async (id: string, updates: Partial<Project>) => {
+    try {
+      const res = await apiService.updateProject(Number(id), updates); // PATCH /api/projects/:id/
+      if (!res.success || !res.data) throw new Error(res.message || "Failed to update project");
+
+      const updated: Project = {
+        id: String(res.data.id),
+        name: res.data.name,
+        color: res.data.color || "#BEFCA9",
+        taskCount: res.data.task_count ?? 0,
+        status: res.data.status ?? "to-do",
+        description: res.data.description ?? "",
+        createdAt: res.data.created_at ?? res.data.createdAt,
+      };
+
+      setProjects(prev => prev.map(p => (p.id === id ? updated : p)));
+      setCurrentProject(prev => (prev?.id === id ? updated : prev));
+      return updated;
+    } catch (e) {
+      console.error("updateProject error:", e);
       return null;
     }
   };
@@ -138,6 +169,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
       reloadProjects,
       selectProject,
       addProject,
+      updateProject,
       deleteProject,
     }),
     [projects, currentProject, loading, error],
