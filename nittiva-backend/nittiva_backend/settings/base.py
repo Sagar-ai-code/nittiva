@@ -22,8 +22,15 @@ def env_bool(name: str, default: bool = False) -> bool:
 # -------------------------------------------------------------------
 # Core
 # -------------------------------------------------------------------
-SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret")
-DEBUG = env_bool("DEBUG", True)
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError(
+        "SECRET_KEY environment variable is required. "
+        "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(64))\""
+    )
+
+# Default DEBUG to False for safety; development.py overrides to True
+DEBUG = env_bool("DEBUG", False)
 
 # Google OAuth Settings
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")

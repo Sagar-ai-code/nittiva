@@ -6,6 +6,7 @@ This package contains all URL routing organized by domain.
 
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
+from rest_framework_simplejwt.views import TokenRefreshView
 
 from ..views import (
     LoginView,
@@ -55,6 +56,7 @@ router.register(r'task-priorities', TaskPriorityViewSet, basename='task-priority
 urlpatterns = [
     # Authentication
     path('auth/login', LoginView.as_view(), name='login'),
+    path('auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('auth/register', register, name='register'),
     path('auth/google', google_auth, name='google_auth'),
     
