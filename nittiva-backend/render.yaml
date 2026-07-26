@@ -18,6 +18,20 @@ services:
         value: "*"
       - key: CORS_ALLOWED_ORIGINS
         value: "https://nittiva.vercel.app,https://*.vercel.app"
+      # Email (optional — leave SMTP creds blank to log to console; set them in
+      # the Render dashboard to enable real email delivery for password reset / invites)
+      - key: DEFAULT_FROM_EMAIL
+        value: "noreply@nittiva.com"
+      - key: EMAIL_HOST
+        value: "smtp.gmail.com"
+      - key: EMAIL_PORT
+        value: "587"
+      - key: EMAIL_USE_TLS
+        value: "True"
+      - key: EMAIL_HOST_USER
+        value: ""
+      - key: EMAIL_HOST_PASSWORD
+        value: ""
     disk:
       name: sqlite-data
       mountPath: /opt/render/project/src
