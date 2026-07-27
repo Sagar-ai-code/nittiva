@@ -4,7 +4,7 @@ services:
     runtime: python
     plan: free
     buildCommand: "pip install -r requirements.txt && python manage.py collectstatic --noinput"
-    startCommand: "python manage.py migrate && python manage.py seed_data && gunicorn nittiva_backend.wsgi:application --bind 0.0.0.0:$PORT"
+    startCommand: "mkdir -p $STORAGE_PATH && python manage.py migrate && python manage.py seed_data && gunicorn nittiva_backend.wsgi:application --bind 0.0.0.0:$PORT"
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
@@ -18,6 +18,12 @@ services:
         value: "*"
       - key: CORS_ALLOWED_ORIGINS
         value: "https://nittiva.vercel.app,https://*.vercel.app"
+      # STORAGE_PATH: where the SQLite db.sqlite3 lives. Must be on the
+      # persistent disk (mountPath below). The default (BASE_DIR) puts
+      # the file alongside the source code which is wiped on every
+      # deploy — set this env var to keep the data.
+      - key: STORAGE_PATH
+        value: /var/data
       # Email (optional — leave SMTP creds blank to log to console; set them in
       # the Render dashboard to enable real email delivery for password reset / invites)
       - key: DEFAULT_FROM_EMAIL
@@ -34,5 +40,5 @@ services:
         value: ""
     disk:
       name: sqlite-data
-      mountPath: /opt/render/project/src
+      mountPath: /var/data
       sizeGB: 1

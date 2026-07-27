@@ -143,10 +143,17 @@ if os.getenv("POSTGRES_HOST"):
         }
     }
 else:
+    # SQLite path is configurable via STORAGE_PATH so ops can put the DB
+    # on a persistent volume. Defaults to BASE_DIR / "db.sqlite3" which
+    # lives inside the source tree — fine for local dev, NOT for
+    # production on Render's free plan (the source tree is wiped on
+    # every deploy; the persistent disk must be at a separate path).
+    # See render.yaml for the STORAGE_PATH env var the deploy uses.
+    _storage_dir = os.getenv("STORAGE_PATH") or str(BASE_DIR)
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
-            "NAME": BASE_DIR / "db.sqlite3",
+            "NAME": os.path.join(_storage_dir, "db.sqlite3"),
         }
     }
 
