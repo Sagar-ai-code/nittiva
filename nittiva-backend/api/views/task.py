@@ -92,4 +92,13 @@ class TaskSubscriberViewSet(viewsets.ModelViewSet):
         tenant_id = get_current_tenant_id(self.request)
         if not tenant_id:
             raise ValidationError("Tenant not found.")
-        serializer.save(tenant_id=tenant_id)
+        # `user` is read-only on the serializer (so the client can't
+        # subscribe someone else), so we always set it to the current user.
+        # The "Subscribe" button on the frontend only ever subscribes
+        # yourself; if you want to add a watcher, do it via the @mention
+        # flow on a note/comment.
+        serializer.save(
+            tenant_id=tenant_id,
+            user=self.request.user,
+            created_by=self.request.user,
+        )

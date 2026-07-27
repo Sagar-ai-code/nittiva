@@ -74,10 +74,21 @@ def maybe_subscribe_on_note_or_comment(
     user_ids.add(author_id)
     user_ids.discard(None)
 
-    # task_id is what TaskSubscriber expects; for now assume object_id is the task UUID
+    # task_id is what TaskSubscriber expects. Task uses BigAutoField (integer)
+    # while Note.object_id / Comment.object_id are now CharField, so we
+    # coerce the string to int when content_type is "task". If the cast
+    # fails (e.g., the value isn't a valid integer for a task), the
+    # subscription is silently skipped — better than failing the create.
+    task_id = object_id
+    try:
+        task_id = int(object_id)
+    except (TypeError, ValueError):
+        # Not an int-shaped task id; let subscribe_users_to_task handle it
+        # and fail-soft via the try/except below.
+        pass
     try:
         subscribe_users_to_task(
-            task_id=object_id,
+            task_id=task_id,
             user_ids=user_ids,
             added_by_id=author_id,
         )
