@@ -16,6 +16,8 @@ Returns a list of user IDs. Duplicates removed.
 import re
 from typing import List, Optional
 
+from django.db.models import Q
+
 # Match @<word> where word is one or more of:
 #   - letters / digits
 #   - . - + _
@@ -46,7 +48,6 @@ def parse_mentions(text: Optional[str], tenant_id) -> List:
     from api.models import User
 
     user_ids: set = set()
-    # Cache for repeated candidates
     for candidate in candidates:
         # 1. Exact email match
         user = User.objects.filter(tenant_id=tenant_id, email__iexact=candidate).first()
@@ -61,10 +62,26 @@ def parse_mentions(text: Optional[str], tenant_id) -> List:
             if user:
                 user_ids.add(user.id)
                 continue
-        # 3. Exact name match
+        # 3. Full-name match (case-insensitive): "@priya sharma"
         user = User.objects.filter(tenant_id=tenant_id, name__iexact=candidate).first()
         if user:
             user_ids.add(user.id)
+            continue
+        # 4. First-name or last-name match: "@priya" or "@sharma"
+        #     Matches anyone in the tenant whose name (lowercased) starts
+        #     with the candidate (lowercased). If multiple match, the first
+        #     one (by created_at) wins. (Plane's "loose" behavior; precise
+        #     pickers are handled by the @mention UI's dropdown.)
+        if " " not in candidate:
+            user = (
+                User.objects
+                .filter(tenant_id=tenant_id)
+                .filter(Q(name__istartswith=candidate) | Q(name__icontains=" " + candidate))
+                .order_by("id")
+                .first()
+            )
+            if user:
+                user_ids.add(user.id)
 
     return list(user_ids)
 
