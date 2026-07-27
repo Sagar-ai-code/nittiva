@@ -43,6 +43,7 @@ def _sync_mentions_and_side_effects(note: Note, actor):
             object_id=note.object_id,
             author_id=actor.id if actor else None,
             mentioned_user_ids=mentioned_ids,
+            tenant_id=note.tenant_id,
         )
         # Notify each mentioned user
         if mentioned_ids:

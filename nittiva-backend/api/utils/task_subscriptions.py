@@ -60,15 +60,19 @@ def maybe_subscribe_on_note_or_comment(
     object_id,
     author_id,
     mentioned_user_ids: Optional[Iterable] = None,
+    tenant_id=None,
 ):
     """If the note/comment is attached to a task, auto-subscribe the relevant users.
 
     Triggered on every Note / Comment creation. For 'task' content_type, subscribes:
       - The author (so they get notifications about changes to the task)
       - Each @-mentioned user (so they get notified about this comment)
+
+    `tenant_id` is required so the resulting TaskSubscriber rows are
+    visible to the tenant-scoped /api/task-subscribers/ view.
     """
     if content_type != "task" or not object_id:
-        return
+        return 0
 
     user_ids = set(mentioned_user_ids or [])
     user_ids.add(author_id)
@@ -91,6 +95,7 @@ def maybe_subscribe_on_note_or_comment(
             task_id=task_id,
             user_ids=user_ids,
             added_by_id=author_id,
+            tenant_id=tenant_id,
         )
         return new_subs  # return count for callers / debugging
     except Exception as e:  # noqa: BLE001

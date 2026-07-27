@@ -41,6 +41,7 @@ def _sync_mentions_and_side_effects(comment: Comment, actor):
                 object_id=comment.object_id,
                 author_id=actor.id if actor else None,
                 mentioned_user_ids=mentioned_ids,
+                tenant_id=comment.tenant_id,
             )
             comment._sync_subscribers_added = new_subs
             comment._sync_user_ids = list(
