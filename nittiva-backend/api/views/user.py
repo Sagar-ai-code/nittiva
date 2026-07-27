@@ -5,6 +5,7 @@ This module contains viewsets for user management.
 """
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
 from django.db.models import Q
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import permissions, viewsets, status, filters
@@ -15,7 +16,7 @@ from rest_framework.response import Response
 from ..permissions import IsAdminOrReadOnly
 from ..serializers import UserSerializer
 from ..utils.tenant import get_current_tenant_id
-from ..utils.responses import success_response
+from ..utils.responses import success_response, error_response
 
 User = get_user_model()
 
@@ -96,5 +97,47 @@ class UserViewSet(viewsets.ModelViewSet):
                 for u in qs
             ]
         })
+
+    @action(detail=True, methods=['post'], url_path='set_password')
+    def set_password(self, request, pk=None):
+        """Admin-only: set a user's password directly.
+
+        POST /api/users/<id>/set_password/  body: {"password": "..."}
+
+        Use case: bootstrap scripts that create users via the API
+        (which doesn't accept a password field) and then need to
+        set one so the user can log in. In production, prefer
+        the password-reset email flow.
+        """
+        # Restrict to admin-like roles: superuser, staff, or the user themselves.
+        is_self = str(request.user.id) == str(pk)
+        if not (request.user.is_superuser or request.user.is_staff or is_self):
+            return error_response(
+                message="Only admins or the user themselves can set a password here.",
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        password = (request.data.get("password") or "").strip()
+        if not password:
+            return error_response(
+                message="password is required",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            validate_password(password)
+        except Exception as e:  # noqa: BLE001
+            return error_response(
+                message="; ".join(e.messages) if hasattr(e, "messages") else str(e),
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user = self.get_object()
+        user.set_password(password)
+        user.save(update_fields=["password"])
+        return success_response(
+            data={"id": str(user.id), "email": user.email},
+            message="Password updated.",
+        )
 
 
