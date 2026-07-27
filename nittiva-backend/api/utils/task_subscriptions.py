@@ -97,16 +97,12 @@ def maybe_subscribe_on_note_or_comment(
             added_by_id=author_id,
             tenant_id=tenant_id,
         )
-        return new_subs  # return count for callers / debugging
+        return new_subs
     except Exception as e:  # noqa: BLE001
-        import traceback
-        # Re-raise with a clearer message so we can see the error in the
-        # comment response (debug only — should not be left in production).
-        raise Exception(
-            f"maybe_subscribe failed: {type(e).__name__}: {e}\n"
-            f"object_id={object_id!r}, task_id={task_id!r}, user_ids={list(user_ids)!r}\n"
-            f"{traceback.format_exc()}"
-        ) from e
+        # Subscription is best-effort. If the task doesn't exist or anything
+        # else fails, we don't want to fail the whole note/comment creation.
+        logger.warning("Failed to auto-subscribe users to task %s: %s",
+                       object_id, e)
 
 
 def notify_mentioned_users(

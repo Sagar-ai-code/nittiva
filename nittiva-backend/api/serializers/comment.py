@@ -14,7 +14,6 @@ class CommentSerializer(serializers.ModelSerializer):
     author = UserSerializer(read_only=True)
     replies = serializers.SerializerMethodField()
     replies_count = serializers.SerializerMethodField()
-    _debug_sync = serializers.SerializerMethodField()
 
     class Meta:
         model = Comment
@@ -27,11 +26,10 @@ class CommentSerializer(serializers.ModelSerializer):
             "parent",
             "replies",
             "replies_count",
-            "_debug_sync",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "author", "created_at", "updated_at", "_debug_sync"]
+        read_only_fields = ["id", "author", "created_at", "updated_at"]
 
     def get_replies(self, obj):
         """Get nested replies."""
@@ -41,18 +39,6 @@ class CommentSerializer(serializers.ModelSerializer):
     def get_replies_count(self, obj):
         """Get count of replies."""
         return obj.replies.count()
-
-    def get__debug_sync(self, obj):
-        """Surface the auto-subscribe / mention-sync result so we can
-        debug the @mention flow end-to-end from the API response.
-        Returns None on the read path; populated only on a fresh create."""
-        if not (hasattr(obj, "_sync_subscribers_added") or hasattr(obj, "_sync_error") or hasattr(obj, "_sync_user_ids")):
-            return None
-        return {
-            "subscribers_added": getattr(obj, "_sync_subscribers_added", None),
-            "user_ids": getattr(obj, "_sync_user_ids", None),
-            "error": getattr(obj, "_sync_error", None),
-        }
 
     def create(self, validated_data):
         request = self.context.get("request")

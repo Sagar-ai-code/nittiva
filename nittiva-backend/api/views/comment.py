@@ -35,21 +35,13 @@ def _sync_mentions_and_side_effects(comment: Comment, actor):
                 ],
                 ignore_conflicts=True,
             )
-        try:
-            new_subs = maybe_subscribe_on_note_or_comment(
-                content_type=comment.content_type,
-                object_id=comment.object_id,
-                author_id=actor.id if actor else None,
-                mentioned_user_ids=mentioned_ids,
-                tenant_id=comment.tenant_id,
-            )
-            comment._sync_subscribers_added = new_subs
-            comment._sync_user_ids = list(
-                set((mentioned_ids or []) + ([actor.id] if actor and actor.id else []))
-            )
-        except Exception as sub_err:
-            import traceback
-            comment._sync_error = f"maybe_subscribe failed: {type(sub_err).__name__}: {sub_err}\n{traceback.format_exc()}"
+        maybe_subscribe_on_note_or_comment(
+            content_type=comment.content_type,
+            object_id=comment.object_id,
+            author_id=actor.id if actor else None,
+            mentioned_user_ids=mentioned_ids,
+            tenant_id=comment.tenant_id,
+        )
         if mentioned_ids:
             preview = (comment.content or "")[:140]
             notify_mentioned_users(
@@ -61,11 +53,8 @@ def _sync_mentions_and_side_effects(comment: Comment, actor):
                 tenant_id=comment.tenant_id,
             )
     except Exception:
-        import traceback
         import logging
         logging.getLogger(__name__).exception("Mention/subscribe sync failed for comment %s", comment.id)
-        # Surface the error on the comment so the response includes it.
-        comment._sync_error = traceback.format_exc()
 
 
 class CommentViewSet(viewsets.ModelViewSet):
