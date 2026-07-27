@@ -142,6 +142,22 @@ if os.getenv("POSTGRES_HOST"):
             "PORT": os.getenv("POSTGRES_PORT", "5432"),
         }
     }
+elif os.getenv("DATABASE_URL"):
+    # Render and Heroku both set DATABASE_URL via the connectionString property
+    # of a linked pserv. dj-database-url is already a transitive dep of
+    # django-environ, but parse it manually so we don't need an extra import.
+    import urllib.parse as _u
+    _p = _u.urlparse(os.getenv("DATABASE_URL", ""))
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": (_p.path or "/").lstrip("/"),
+            "USER": _p.username or "nittiva",
+            "PASSWORD": _p.password or "",
+            "HOST": _p.hostname or "localhost",
+            "PORT": str(_p.port or 5432),
+        }
+    }
 else:
     # SQLite path is configurable via STORAGE_PATH so ops can put the DB
     # on a persistent volume. Defaults to BASE_DIR / "db.sqlite3" which
