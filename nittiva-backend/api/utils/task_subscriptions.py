@@ -92,13 +92,7 @@ def maybe_subscribe_on_note_or_comment(
             user_ids=user_ids,
             added_by_id=author_id,
         )
-        # Stash on the caller's frame for debugging
-        import inspect
-        frame = inspect.currentframe().f_back
-        if frame:
-            frame.f_locals["__DEBUG_NEW_SUBS__"] = new_subs
-            frame.f_locals["__DEBUG_USER_IDS__"] = list(user_ids)
-            frame.f_locals["__DEBUG_TASK_ID__"] = task_id
+        return new_subs  # return count for callers / debugging
     except Exception as e:  # noqa: BLE001
         import traceback
         # Re-raise with a clearer message so we can see the error in the

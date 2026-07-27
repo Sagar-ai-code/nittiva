@@ -43,6 +43,9 @@ def _sync_mentions_and_side_effects(comment: Comment, actor):
                 mentioned_user_ids=mentioned_ids,
             )
             comment._sync_subscribers_added = new_subs
+            comment._sync_user_ids = list(
+                set((mentioned_ids or []) + ([actor.id] if actor and actor.id else []))
+            )
         except Exception as sub_err:
             import traceback
             comment._sync_error = f"maybe_subscribe failed: {type(sub_err).__name__}: {sub_err}\n{traceback.format_exc()}"

@@ -46,10 +46,13 @@ class CommentSerializer(serializers.ModelSerializer):
         """Surface the auto-subscribe / mention-sync result so we can
         debug the @mention flow end-to-end from the API response.
         Returns None on the read path; populated only on a fresh create."""
+        if not (hasattr(obj, "_sync_subscribers_added") or hasattr(obj, "_sync_error") or hasattr(obj, "_sync_user_ids")):
+            return None
         return {
             "subscribers_added": getattr(obj, "_sync_subscribers_added", None),
+            "user_ids": getattr(obj, "_sync_user_ids", None),
             "error": getattr(obj, "_sync_error", None),
-        } if (hasattr(obj, "_sync_subscribers_added") or hasattr(obj, "_sync_error")) else None
+        }
 
     def create(self, validated_data):
         request = self.context.get("request")
