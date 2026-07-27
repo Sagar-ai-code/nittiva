@@ -228,4 +228,19 @@ class TaskSubscriberSerializer(serializers.ModelSerializer):
             validated_data["user"] = request.user
             validated_data["created_by"] = request.user
         validated_data["tenant_id"] = getattr(request, "tenant_id", None)
-        return super().create(validated_data)
+        try:
+            return super().create(validated_data)
+        except Exception as e:
+            # Re-raise with a useful message so the 500 response includes
+            # the actual cause. Useful for the @mention e2e flow.
+            import traceback
+            raise Exception(
+                f"TaskSubscriber create failed: {type(e).__name__}: {e}; "
+                f"validated_data keys: {sorted(validated_data.keys())}; "
+                f"task={validated_data.get('task')!r} "
+                f"({type(validated_data.get('task')).__name__}), "
+                f"user={getattr(validated_data.get('user'), 'id', None)!r}, "
+                f"created_by={getattr(validated_data.get('created_by'), 'id', None)!r}, "
+                f"tenant_id={validated_data.get('tenant_id')!r} "
+                f"({type(validated_data.get('tenant_id')).__name__})"
+            ) from e
