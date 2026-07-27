@@ -15,6 +15,18 @@ from ..utils.tenant import get_current_tenant_id
 
 
 class TaskViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for task management.
+
+    - Staff sees all
+    - Regular users see tasks in accessible projects OR assigned directly
+    - Auto-add assignees as project members on create/update
+    """
+
+    serializer_class = TaskSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ["status", "priority", "project"]
 
     def get_queryset(self):
         """Get queryset filtered by tenant and user permissions."""
