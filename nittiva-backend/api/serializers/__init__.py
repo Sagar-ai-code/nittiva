@@ -7,7 +7,7 @@ This package contains all DRF serializers organized by domain.
 from .user import RegisterSerializer, UserSerializer, GoogleAuthSerializer
 from .client import ClientSerializer
 from .project import ProjectSerializer, ProjectMemberSerializer
-from .task import TaskSerializer, TaskAssignmentSerializer
+from .task import TaskSerializer, TaskAssignmentSerializer, TaskSubscriberSerializer
 from .password_reset import PasswordResetRequestSerializer, PasswordResetSerializer
 from .invitation import InvitationSerializer, CreateInvitationSerializer, AcceptInvitationSerializer
 from .tenant import TenantSerializer
@@ -35,6 +35,7 @@ __all__ = [
     "ProjectMemberSerializer",
     "TaskSerializer",
     "TaskAssignmentSerializer",
+    "TaskSubscriberSerializer",
     "PasswordResetRequestSerializer",
     "PasswordResetSerializer",
     "InvitationSerializer",

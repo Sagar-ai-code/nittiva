@@ -9,24 +9,12 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import permissions, viewsets
 from rest_framework.exceptions import ValidationError
 
-from ..models import Task
-from ..serializers import TaskSerializer
+from ..models import Task, TaskSubscriber
+from ..serializers import TaskSerializer, TaskSubscriberSerializer
 from ..utils.tenant import get_current_tenant_id
 
 
 class TaskViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet for task management.
-    
-    - Staff sees all
-    - Regular users see tasks in accessible projects OR assigned directly
-    - Auto-add assignees as project members on create/update
-    """
-
-    serializer_class = TaskSerializer
-    permission_classes = [permissions.IsAuthenticated]
-    filter_backends = [DjangoFilterBackend]
-    filterset_fields = ["status", "priority", "project"]
 
     def get_queryset(self):
         """Get queryset filtered by tenant and user permissions."""
@@ -64,3 +52,32 @@ class TaskViewSet(viewsets.ModelViewSet):
         # tenant_id is already set in serializer.create() method, so just save
         serializer.save()
 
+
+
+class TaskSubscriberViewSet(viewsets.ModelViewSet):
+    """CRUD on TaskSubscriber — who watches a task.
+
+    Filter via `?task=<id>`. To unsubscribe, just DELETE the row.
+    """
+
+    serializer_class = TaskSubscriberSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        tenant_id = get_current_tenant_id(self.request)
+        if not tenant_id:
+            raise ValidationError("Tenant not found.")
+        qs = TaskSubscriber.objects.filter(tenant_id=tenant_id)
+        task_id = self.request.query_params.get("task")
+        if task_id:
+            qs = qs.filter(task_id=task_id)
+        user_id = self.request.query_params.get("user")
+        if user_id:
+            qs = qs.filter(user_id=user_id)
+        return qs.order_by("-created_at")
+
+    def perform_create(self, serializer):
+        tenant_id = get_current_tenant_id(self.request)
+        if not tenant_id:
+            raise ValidationError("Tenant not found.")
+        serializer.save(tenant_id=tenant_id)

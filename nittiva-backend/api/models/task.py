@@ -4,6 +4,8 @@ Task models.
 This module contains Task and TaskAssignment models for managing tasks and assignments.
 """
 
+import uuid
+
 from django.conf import settings
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
@@ -155,7 +157,7 @@ class TaskAssignment(models.Model):
 
     # Multi-tenant: Each task assignment belongs to a tenant
     tenant_id = models.UUIDField(null=True, blank=True, db_index=True, help_text="Tenant this assignment belongs to")
-    
+
     task = models.ForeignKey(
         Task,
         on_delete=models.CASCADE,
@@ -177,4 +179,55 @@ class TaskAssignment(models.Model):
         constraints = [
             UniqueConstraint(fields=["task", "user"], name="uniq_task_user"),
         ]
+
+
+class TaskSubscriber(models.Model):
+    """A user who is watching a task — gets notifications about changes.
+
+    Populated when:
+      - A user is @-mentioned in a note or comment on the task
+      - A user creates a note or comment on the task (the author)
+      - A user is added explicitly via the API
+
+    Patterned after Plane's IssueSubscriber. Subscribers are NOT assignees
+    — they receive notifications, but the work isn't owned by them.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    tenant_id = models.UUIDField(null=True, blank=True, db_index=True)
+
+    task = models.ForeignKey(
+        Task,
+        on_delete=models.CASCADE,
+        related_name="subscribers",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="task_subscriptions",
+    )
+
+    # Optional: who added this subscription (the mention parser, the author themselves, or a manager)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="task_subscriptions_created",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "task_subscribers"
+        constraints = [
+            UniqueConstraint(fields=["task", "user"], name="uniq_task_subscriber"),
+        ]
+        indexes = [
+            models.Index(fields=["tenant_id", "task"]),
+            models.Index(fields=["tenant_id", "user"]),
+        ]
+
+    def __str__(self):
+        return f"{self.user_id} watches {self.task_id}"
+
 

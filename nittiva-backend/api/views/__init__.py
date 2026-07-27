@@ -8,7 +8,7 @@ from .auth import LoginView, register, healthz, readyz, google_auth
 from .user import UserViewSet
 from .client import ClientViewSet
 from .project import ProjectViewSet
-from .task import TaskViewSet
+from .task import TaskViewSet, TaskSubscriberViewSet
 from .password_reset import request_password_reset, reset_password
 from .dashboard import dashboard_statistics
 from .invitation import invite_user_to_project, list_project_invitations, accept_invitation, get_invitation_by_token
@@ -41,6 +41,7 @@ __all__ = [
     "ClientViewSet",
     "ProjectViewSet",
     "TaskViewSet",
+    "TaskSubscriberViewSet",
     "invite_user_to_project",
     "list_project_invitations",
     "accept_invitation",

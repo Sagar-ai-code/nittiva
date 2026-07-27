@@ -102,6 +102,10 @@ echo "Round 5 - Chat / Invoice"
 check "GET /chat/rooms/"     200 GET "$API_URL/chat/rooms/"             "" "$TOKEN"
 check "GET /invoices/"       200 GET "$API_URL/invoices/"               "" "$TOKEN"
 
+echo
+echo "Round 6 - Mentions + Task Subscribers"
+check "GET /task-subscribers/" 200 GET "$API_URL/task-subscribers/"     "" "$TOKEN"
+
 # Sanity: pre-existing viewsets
 echo
 echo "Sanity - pre-existing viewsets"

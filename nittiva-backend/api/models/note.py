@@ -56,3 +56,51 @@ class Note(models.Model):
         target = f"{self.content_type}:{self.object_id}"
         title = self.title or (self.content[:30] + "…" if len(self.content) > 30 else self.content)
         return f"Note({title!r} on {target})"
+
+
+class NoteMention(models.Model):
+    """Records that a user was @-mentioned in a Note's content.
+
+    Populated by the mention parser when a Note is saved. Each row is one
+    (note, mentioned_user) pair. Patterned after Plane's IssueMention.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    tenant_id = models.UUIDField(null=True, blank=True, db_index=True)
+
+    note = models.ForeignKey(
+        Note,
+        on_delete=models.CASCADE,
+        related_name="mentions",
+    )
+    mentioned_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="note_mentions",
+    )
+
+    # Who added the mention (usually == note.author)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="note_mentions_created",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "note_mentions"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["note", "mentioned_user"],
+                name="uniq_note_mentioned_user",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["tenant_id", "mentioned_user"]),
+        ]
+
+    def __str__(self):
+        return f"Mention of {self.mentioned_user_id} in note {self.note_id}"
+

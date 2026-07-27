@@ -8,16 +8,16 @@ from .tenant import Tenant
 from .user import User, UserManager
 from .client import Client
 from .project import Project, ProjectMember
-from .task import Task, TaskAssignment
+from .task import Task, TaskAssignment, TaskSubscriber
 from .invitation import Invitation
 from .goal import Goal, GoalLinkedEntity
-from .comment import Comment
+from .comment import Comment, CommentMention
 from .attachment import Attachment
 from .time_log import TimeLog
 from .custom_field import CustomField
 from .sprint import Sprint, SprintMember
 from .task_status import TaskStatus, TaskPriority
-from .note import Note
+from .note import Note, NoteMention
 from .todo import Todo
 from .meeting import Meeting
 from .leave_request import LeaveRequest
@@ -34,10 +34,12 @@ __all__ = [
     "ProjectMember",
     "Task",
     "TaskAssignment",
+    "TaskSubscriber",
     "Invitation",
     "Goal",
     "GoalLinkedEntity",
     "Comment",
+    "CommentMention",
     "Attachment",
     "TimeLog",
     "CustomField",
@@ -46,6 +48,7 @@ __all__ = [
     "TaskStatus",
     "TaskPriority",
     "Note",
+    "NoteMention",
     "Todo",
     "Meeting",
     "LeaveRequest",

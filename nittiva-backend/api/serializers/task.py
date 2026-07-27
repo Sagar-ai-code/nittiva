@@ -8,7 +8,7 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.db import transaction
 
-from ..models import Task, TaskAssignment, Project, TaskStatus, TaskPriority
+from ..models import Task, TaskAssignment, Project, TaskStatus, TaskPriority, TaskSubscriber
 from .user import UserSerializer
 from .task_status import TaskStatusSerializer, TaskPrioritySerializer
 
@@ -207,3 +207,20 @@ class TaskSerializer(serializers.ModelSerializer):
             self._set_assignees(instance, assignee_ids)
         return instance
 
+
+
+class TaskSubscriberSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+    created_by = UserSerializer(read_only=True)
+
+    class Meta:
+        model = TaskSubscriber
+        fields = ["id", "task", "user", "created_by", "created_at"]
+        read_only_fields = ["id", "user", "created_by", "created_at"]
+
+    def create(self, validated_data):
+        request = self.context.get("request")
+        if request and request.user.is_authenticated:
+            validated_data["created_by"] = request.user
+        validated_data["tenant_id"] = getattr(request, "tenant_id", None)
+        return super().create(validated_data)
