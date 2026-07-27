@@ -206,6 +206,26 @@ If any one of these is missing, the task is **not done**.
 
 ## 7. Open issues (admin should resolve)
 
-- **DB persistence**: I-3 was supposed to fix this (`STORAGE_PATH=/var/data`). Still seeing tenant ID rotate between fresh logins. Verify on the next deploy; if still broken, switch to Postgres (the `POSTGRES_HOST` env-var branch in `settings/base.py` is already wired up).
+- **DB persistence (URGENT)**: I-3 was supposed to fix this (`STORAGE_PATH=/var/data` on the persistent disk at `/var/data`). **It is NOT working on Render's free plan** — the disk is being wiped on every deploy, so every fresh deploy creates a new admin tenant (new `company_id`) and the 5 agents + project + tasks get wiped with the old one. **Recommended fix**: switch to Postgres (the `POSTGRES_HOST` env-var branch in `settings/base.py` is already wired up — just set it in the Render dashboard). Until then, **re-bootstrap after every deploy** by running `bash /tmp/nittiva-bootstrap.sh`. The script is idempotent.
 - **SMTP creds in Render dashboard**: `EMAIL_HOST_USER` and `EMAIL_HOST_PASSWORD` are blank in `render.yaml`. Until real creds are set, every "send email" call (A-1 invite, A-2 test, V-3 digest) returns the URL in the response so the UI can show it as a copyable link (Wekan pattern).
 - **GitHub PAT + Render deploy hook exposed in chat**: both should be rotated before going to production.
+- **All agents must explicitly pass `company_id` on login**: when Vikram (or any other agent) logs in via `POST /api/auth/login`, include `"company_id": "<ADMIN_COMPANY>"` in the body so they land in the same tenant as the admin. Without it, the middleware may assign them a different tenant (because `tenant_id` on the user row is `null` when created via `POST /api/users/`, only `set_password` runs after).
+
+---
+
+## 8. Admin visibility — what you can see (and where)
+
+The single source of truth: every action an agent takes goes through the API, and every API call carries the tenant + user. Admin sees everything in the same tenant.
+
+| Agent action | Visible to admin at | UI page |
+|---|---|---|
+| Logged in | `GET /api/users/?role=manager` (the 5 agents) | `/dashboard/users` |
+| Started timer on a task | `GET /api/time-logs/active_timers/` (live panel) | `/dashboard/progress` → "Currently working" card |
+| Total time on tasks | `GET /api/time-logs/agents_summary/` | `/dashboard/progress` → "Total time per agent" cards |
+| Time log detail per agent | `GET /api/time-logs/?user=<id>` | `/dashboard/agents/<id>/time-logs` |
+| Commented on a task | `GET /api/comments/?content_type=tasks.task&object_id=<task_id>` | `/dashboard/tasks/<id>` (right side) |
+| Updated a task (status, priority, etc.) | `GET /api/tasks/<id>/history/` (verb=`updated`, diff has the change) | `/dashboard/tasks/<id>` (right sidebar — P-4 will wire this up) |
+| Got assigned to a task | `GET /api/notifications/unread_count/` (incremented) | `/dashboard/notifications` |
+| Marked task done | `GET /api/tasks/<id>/` (status=`completed`) | `/dashboard/tasks/<id>` |
+
+**Quickest way to see what's happening right now**: open `https://nittiva-frontend.vercel.app/dashboard/progress` after logging in as `admin@nittiva.local`. The top "Currently working" card lists every agent with an active timer, what task they're on, and how long they've been working (live ticker).
