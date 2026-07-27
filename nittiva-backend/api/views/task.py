@@ -94,4 +94,16 @@ class TaskSubscriberViewSet(viewsets.ModelViewSet):
             raise ValidationError("Tenant not found.")
         # The serializer's create() populates user/created_by/tenant_id
         # from the request, so we just trigger save here.
-        serializer.save(tenant_id=tenant_id)
+        try:
+            serializer.save(tenant_id=tenant_id)
+        except Exception as e:
+            # Re-raise with full context so 500 responses show the cause.
+            # (DEBUG=False in production strips the default Django error page.)
+            import traceback
+            raise Exception(
+                f"TaskSubscriberViewSet.perform_create failed: "
+                f"{type(e).__name__}: {e}\n"
+                f"tenant_id={tenant_id!r}, request.user={self.request.user!r}, "
+                f"request.tenant={getattr(self.request, 'tenant', None)!r}\n"
+                f"{traceback.format_exc()}"
+            ) from e
