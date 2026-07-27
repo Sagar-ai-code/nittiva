@@ -108,6 +108,20 @@ check "GET /task-subscribers/" 200 GET "$API_URL/task-subscribers/"     "" "$TOK
 check "GET /users/search/?q=admin" 200 GET "$API_URL/users/search/?q=admin&limit=5" "" "$TOKEN"
 check "GET /users/search/ (no q)" 200 GET "$API_URL/users/search/?limit=5"          "" "$TOKEN"
 
+# End-to-end: post a comment with @mention, verify the response is 201.
+# Verifies the full path: serializer → viewset → mention parser → bulk_create.
+# (The auto-subscribe + notification side effects are best-effort and
+# verified manually in NITTIVA_MENTION_RESEARCH.md.)
+TASK_ID=$(curl -s -H "Authorization: Bearer $TOKEN" "$API_URL/tasks/" \
+          | jq -r '(.results[0].id // .[0].id // empty)' 2>/dev/null)
+if [[ -n "$TASK_ID" ]]; then
+  check "POST /comments/ (with @admin mention) on task $TASK_ID" 201 POST "$API_URL/comments/" \
+        "{\"content_type\":\"task\",\"object_id\":\"$TASK_ID\",\"content\":\"@admin smoke test mention\"}" \
+        "$TOKEN"
+else
+  printf "  \033[33m⊘\033[0m %-40s [no tasks in tenant to e2e @mention]\n" "POST /comments/ (with @admin mention)"
+fi
+
 # Sanity: pre-existing viewsets
 echo
 echo "Sanity - pre-existing viewsets"
