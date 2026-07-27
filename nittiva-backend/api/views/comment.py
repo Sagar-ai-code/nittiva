@@ -59,7 +59,9 @@ def _sync_mentions_and_side_effects(comment: Comment, actor):
     # V-1: also write a TaskHistory row when a comment is posted on a task.
     # This is best-effort and runs in the same transaction as the comment
     # create, so a failure here doesn't roll back the comment.
-    if comment.content_type == "task":
+    # Accept both "task" (legacy) and "tasks.task" (Django's app_label.model)
+    # so the history is written regardless of which one the client sends.
+    if comment.content_type in ("task", "tasks.task"):
         try:
             from ..models import Task, TaskHistory
             task = Task.objects.filter(id=comment.object_id).first()
