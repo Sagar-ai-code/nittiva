@@ -219,8 +219,13 @@ class TaskSubscriberSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "user", "created_by", "created_at"]
 
     def create(self, validated_data):
+        """Populate read-only FKs (user, created_by, tenant_id) from the
+        request. We don't accept these from the client — the Watch button
+        always subscribes the current user, and you can't subscribe someone
+        else via this endpoint (use the @mention flow for that)."""
         request = self.context.get("request")
         if request and request.user.is_authenticated:
+            validated_data["user"] = request.user
             validated_data["created_by"] = request.user
         validated_data["tenant_id"] = getattr(request, "tenant_id", None)
         return super().create(validated_data)
