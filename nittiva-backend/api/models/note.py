@@ -21,8 +21,8 @@ class Note(models.Model):
     )
 
     # Generic attachment target: ("task" or "project") + uuid
-    content_type = models.CharField(max_length=20)  # "task" | "project"
-    object_id = models.UUIDField()
+    content_type = models.CharField(max_length=20, help_text='"task" or "project"')
+    object_id = models.UUIDField(help_text="UUID of the task or project this note is attached to")
 
     # Content
     title = models.CharField(max_length=255, blank=True, default="")
@@ -34,6 +34,7 @@ class Note(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         related_name="notes",
+        help_text="User who wrote the note",
     )
 
     # UX helpers

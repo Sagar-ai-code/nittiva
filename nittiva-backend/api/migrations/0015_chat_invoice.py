@@ -1,7 +1,13 @@
 # Hand-written migration for Chat (rooms, memberships, messages) and Invoice (invoices, line items).
+# Updated 2026-07-27 to match Django's auto-generated form after running `manage.py makemigrations`
+# in a Python 3.11 venv per consultant review. Cosmetic-only changes:
+#   - Decimal defaults now use Decimal('0.00') instead of '0.00'
+#   - ChatRoomMembership unique constraint now uses AlterUniqueTogether (Django's preferred form)
+#     instead of AddConstraint with UniqueConstraint
 
 import django.db.models.deletion
 import uuid
+from decimal import Decimal
 from django.conf import settings
 from django.db import migrations, models
 
@@ -50,9 +56,9 @@ class Migration(migrations.Migration):
                 'db_table': 'chat_room_memberships',
             },
         ),
-        migrations.AddConstraint(
-            model_name='chatroommembership',
-            constraint=models.UniqueConstraint(fields=('room', 'user'), name='uniq_chat_room_user'),
+        migrations.AlterUniqueTogether(
+            name='chatroommembership',
+            unique_together={('room', 'user')},
         ),
         migrations.AddIndex(
             model_name='chatroommembership',
@@ -99,11 +105,11 @@ class Migration(migrations.Migration):
                 ('issue_date', models.DateField()),
                 ('due_date', models.DateField()),
                 ('currency', models.CharField(default='USD', max_length=3)),
-                ('tax_rate', models.DecimalField(decimal_places=2, default='0.00', max_digits=5)),
-                ('discount', models.DecimalField(decimal_places=2, default='0.00', max_digits=12)),
-                ('subtotal', models.DecimalField(decimal_places=2, default='0.00', max_digits=12)),
-                ('tax_amount', models.DecimalField(decimal_places=2, default='0.00', max_digits=12)),
-                ('total', models.DecimalField(decimal_places=2, default='0.00', max_digits=12)),
+                ('tax_rate', models.DecimalField(decimal_places=2, default=Decimal('0.00'), max_digits=5)),
+                ('discount', models.DecimalField(decimal_places=2, default=Decimal('0.00'), max_digits=12)),
+                ('subtotal', models.DecimalField(decimal_places=2, default=Decimal('0.00'), max_digits=12)),
+                ('tax_amount', models.DecimalField(decimal_places=2, default=Decimal('0.00'), max_digits=12)),
+                ('total', models.DecimalField(decimal_places=2, default=Decimal('0.00'), max_digits=12)),
                 ('status', models.CharField(choices=[
                     ('draft', 'Draft'), ('sent', 'Sent'), ('paid', 'Paid'),
                     ('overdue', 'Overdue'), ('cancelled', 'Cancelled'),
@@ -135,9 +141,9 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
                 ('description', models.CharField(max_length=500)),
-                ('quantity', models.DecimalField(decimal_places=2, default='1.00', max_digits=10)),
-                ('unit_price', models.DecimalField(decimal_places=2, default='0.00', max_digits=12)),
-                ('line_total', models.DecimalField(decimal_places=2, default='0.00', max_digits=12)),
+                ('quantity', models.DecimalField(decimal_places=2, default=Decimal('1.00'), max_digits=10)),
+                ('unit_price', models.DecimalField(decimal_places=2, default=Decimal('0.00'), max_digits=12)),
+                ('line_total', models.DecimalField(decimal_places=2, default=Decimal('0.00'), max_digits=12)),
                 ('position', models.IntegerField(default=0)),
                 ('invoice', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='line_items', to='api.invoice')),
             ],

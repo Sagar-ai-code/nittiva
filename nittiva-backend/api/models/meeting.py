@@ -35,11 +35,13 @@ class Meeting(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         related_name="organized_meetings",
+        help_text="User who organized the meeting",
     )
     participants = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
         blank=True,
         related_name="meetings",
+        help_text="Users invited to the meeting",
     )
 
     # Optional project link
