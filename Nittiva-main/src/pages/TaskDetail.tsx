@@ -31,6 +31,7 @@ import {
   Clock,
   CheckCircle2,
   Eye,
+  Activity,
 } from "lucide-react";
 import { apiService } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -79,6 +80,63 @@ const priorityIcons = {
   low: { icon: Flag, color: "text-gray-500" },
 };
 
+/**
+ * P-4 (Priya): render a one-line summary for each TaskHistory row.
+ * The `verb` tells us what kind of event; the `diff` is a free-form
+ * JSONField with the structured details. Keep the strings tight and
+ * human-friendly.
+ */
+function renderHistorySummary(h: TaskHistoryEntry): React.ReactNode {
+  const d = h.diff || {};
+  const name = h.actor?.name || h.actor?.email?.split("@")[0] || "Someone";
+  switch (h.verb) {
+    case "created":
+      return <>created this task</>;
+    case "assigned":
+      return (
+        <>
+          assigned <span className="text-white">{d.user_name || d.user_email || "someone"}</span>
+        </>
+      );
+    case "unassigned":
+      return (
+        <>
+          unassigned <span className="text-white">{d.user_name || d.user_email || "someone"}</span>
+        </>
+      );
+    case "commented":
+      return (
+        <>
+          commented: <span className="text-gray-400">"{d.preview || "…"}"</span>
+        </>
+      );
+    case "noted":
+      return <>added a note</>;
+    case "updated":
+    default: {
+      // Render up to 2 field changes per row, in a tight format
+      const entries = Object.entries(d).slice(0, 2);
+      if (entries.length === 0) return <>updated this task</>;
+      return (
+        <>
+          {entries.map(([field, vals], i) => {
+            const [from, to] = vals as [any, any];
+            return (
+              <span key={field}>
+                {i > 0 && ", "}
+                changed <span className="text-white">{field}</span>{" "}
+                from <span className="text-gray-400">{String(from ?? "—")}</span> to{" "}
+                <span className="text-white">{String(to ?? "—")}</span>
+              </span>
+            );
+          })}
+          {Object.keys(d).length > 2 && ` (+${Object.keys(d).length - 2} more)`}
+        </>
+      );
+    }
+  }
+}
+
 export default function TaskDetail() {
   const { taskId } = useParams<{ taskId: string }>();
   const navigate = useNavigate();
@@ -105,6 +163,13 @@ export default function TaskDetail() {
   const [postingComment, setPostingComment] = useState(false);
   const [subscribers, setSubscribers] = useState<TaskSubscriber[]>([]);
   const [loadingSubscribers, setLoadingSubscribers] = useState(false);
+
+  // P-4 (Priya): real activity feed from the TaskHistory endpoint
+  // (V-1, Vikram). Replaces the hardcoded mock activity that used to
+  // live in this sidebar.
+  const [history, setHistory] = useState<TaskHistoryEntry[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
   const currentUserId = (user as any)?.id != null ? String((user as any).id) : null;
   const isCurrentUserSubscribed =
     !!currentUserId &&
@@ -178,14 +243,53 @@ export default function TaskDetail() {
     }
   };
 
-  // Reload comments + subscribers when task changes
+  // P-4: load the real activity feed (TaskHistory rows from V-1)
+  const loadHistory = async () => {
+    if (!task?.id) return;
+    setLoadingHistory(true);
+    try {
+      const response = await apiService.getTaskHistory(task.id);
+      if (response.success && response.data) {
+        const arr = Array.isArray(response.data)
+          ? response.data
+          : (response.data.results || []);
+        setHistory(arr);
+      } else {
+        setHistory([]);
+      }
+    } catch (error) {
+      console.error("Failed to load task history:", error);
+      setHistory([]);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  // Reload comments + subscribers + history when task changes
   useEffect(() => {
     if (task?.id) {
       loadComments();
       loadSubscribers();
+      loadHistory();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task?.id]);
+
+  // P-4: refresh history every 30s so status changes by other agents
+  // show up without a page reload. v2 would be websockets.
+  useEffect(() => {
+    if (!task?.id) return;
+    const interval = setInterval(loadHistory, 30000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task?.id]);
+
+  // Reload history after posting a comment or saving an edit, so the
+  // sidebar reflects the new row immediately.
+  useEffect(() => {
+    if (task?.id) loadHistory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [comments.length, subscribers.length]);
 
   if (!task) {
     return (
@@ -240,9 +344,10 @@ export default function TaskDetail() {
       if (response.success) {
         setNewComment("");
         // Backend will auto-subscribe the author and any mentioned users.
-        // Reload the comments list and the subscribers list.
+        // Reload the comments list, subscribers list, and history.
         await loadComments();
         await loadSubscribers();
+        await loadHistory();
         toast.success("Comment posted");
       } else {
         toast.error(response.message || "Failed to post comment");
@@ -953,46 +1058,28 @@ export default function TaskDetail() {
           </div>
         </div>
 
-        {/* Activity Sidebar */}
+        {/* Activity Sidebar — P-4: real feed from TaskHistory (V-1) */}
         <div className="w-80 border-l border-dashboard-border bg-dashboard-surface/30 flex flex-col">
           <div className="p-4 border-b border-dashboard-border">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-medium text-white flex items-center gap-2">
                 Activity
               </h3>
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-6 h-6 p-0 text-gray-400"
-                >
-                  <Search className="w-3 h-3" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-6 h-6 p-0 text-gray-400"
-                >
-                  <Filter className="w-3 h-3" />
-                </Button>
+              <div className="flex items-center gap-2">
                 <span className="text-xs bg-gray-700 text-gray-300 px-1.5 py-0.5 rounded">
-                  2
+                  {history.length}
                 </span>
                 <Button
                   variant="ghost"
                   size="sm"
+                  onClick={loadHistory}
                   className="w-6 h-6 p-0 text-gray-400"
+                  title="Refresh"
                 >
                   <MoreVertical className="w-3 h-3" />
                 </Button>
               </div>
             </div>
-            <Button
-              variant="ghost"
-              className="text-xs text-gray-400 hover:text-white p-0 h-auto"
-            >
-              Show more
-            </Button>
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -1059,6 +1146,66 @@ export default function TaskDetail() {
                   })
                 )}
               </div>
+            </div>
+
+            <Separator className="bg-dashboard-border" />
+
+            {/* P-4: Real activity feed from TaskHistory (V-1 endpoint).
+                Replaces the hardcoded "Sagar Mantry created this task" mock. */}
+            <div className="space-y-3">
+              <h4 className="text-xs uppercase tracking-wider text-gray-500 flex items-center gap-1.5">
+                <Activity className="w-3 h-3" />
+                Activity ({history.length})
+              </h4>
+              {loadingHistory ? (
+                <div className="text-xs text-gray-500">Loading activity…</div>
+              ) : history.length === 0 ? (
+                <div className="text-xs text-gray-500">
+                  No activity yet. Changes you make (status, priority, assignees)
+                  will appear here.
+                </div>
+              ) : (
+                history.map((h) => {
+                  const actor = h.actor;
+                  const initials = (actor?.name || actor?.email || "?")
+                    .split(/\s+/)
+                    .map((p: string) => p[0])
+                    .filter(Boolean)
+                    .slice(0, 2)
+                    .join("")
+                    .toUpperCase() || "?";
+                  const summary = renderHistorySummary(h);
+                  return (
+                    <div key={h.id} className="flex items-start gap-2">
+                      <Avatar className="w-6 h-6 shrink-0">
+                        {actor?.photo_url ? (
+                          <img
+                            src={actor.photo_url}
+                            alt={actor?.name}
+                            className="w-full h-full object-cover rounded-full"
+                          />
+                        ) : (
+                          <AvatarFallback className="text-[10px] bg-accent/30 text-white">
+                            {initials}
+                          </AvatarFallback>
+                        )}
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs text-gray-400">
+                          <span className="text-white font-medium">
+                            {actor?.name || actor?.email || "Someone"}
+                          </span>{" "}
+                          <span className="text-gray-500">·</span>{" "}
+                          {new Date(h.created_at).toLocaleString()}
+                        </div>
+                        <div className="text-xs text-gray-300 mt-0.5 break-words">
+                          {summary}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
 
             <Separator className="bg-dashboard-border" />
