@@ -1,5 +1,7 @@
 # Nittiva - Task Management System
 
+[![tests](https://github.com/Sagar-ai-code/nittiva/actions/workflows/test.yml/badge.svg)](https://github.com/Sagar-ai-code/nittiva/actions/workflows/test.yml)
+
 A full-stack task management application built with Django REST Framework backend and React frontend.
 
 ## 🚀 Features
