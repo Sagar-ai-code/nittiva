@@ -45,7 +45,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = [
-            "id", "issued_by", "subtotal", "tax_amount", "total",
+            "id", "invoice_number", "issued_by", "subtotal", "tax_amount", "total",
             "paid_at", "created_at", "updated_at",
         ]
 

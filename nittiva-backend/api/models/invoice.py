@@ -20,10 +20,16 @@ class Invoice(models.Model):
         ("cancelled", "Cancelled"),
     ]
 
+    # Numbering prefix for auto-generated invoice numbers, e.g. "INV-".
+    # Tenant-scoped: each tenant gets its own INV-0001, INV-0002, ... sequence.
+    NUMBER_PREFIX = "INV-"
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant_id = models.UUIDField(null=True, blank=True, db_index=True)
 
-    invoice_number = models.CharField(max_length=50, unique=True)
+    # Per-tenant uniqueness (consultant feedback #2). Two tenants can both
+    # have INV-0001; the unique_together below enforces per-tenant uniqueness.
+    invoice_number = models.CharField(max_length=50)
 
     # Relationships
     client = models.ForeignKey(
@@ -71,10 +77,45 @@ class Invoice(models.Model):
             models.Index(fields=["tenant_id", "status"]),
             models.Index(fields=["tenant_id", "-issue_date"]),
         ]
+        # Per-tenant uniqueness on invoice_number. Two tenants can each
+        # have their own INV-0001; the same tenant cannot have two
+        # invoices with the same number.
+        constraints = [
+            models.UniqueConstraint(
+                fields=["tenant_id", "invoice_number"],
+                name="uniq_invoice_per_tenant",
+            ),
+        ]
         ordering = ["-issue_date", "-created_at"]
 
     def __str__(self):
         return f"{self.invoice_number} ({self.status})"
+
+    def save(self, *args, **kwargs):
+        """Auto-generate invoice_number on first save if not provided.
+
+        The number is per-tenant, sequential, formatted as
+        "<NUMBER_PREFIX><4-digit-zero-padded-sequence>" (e.g. "INV-0001").
+
+        The sequence is computed by counting existing invoices for the
+        tenant plus one. To avoid races under concurrent creates we
+        rely on the (tenant_id, invoice_number) UniqueConstraint — if
+        two invoices race for the same number, the database rejects
+        the second one and the caller can retry.
+        """
+        if not self.invoice_number and self.tenant_id:
+            # Lazy import to avoid circular dep at import time
+            from .invoice import Invoice as _Invoice  # noqa: F401
+            # Count existing invoices for the tenant and pick the next number.
+            # Filter by NUMBER_PREFIX so old/migrated numbers don't break the sequence.
+            existing = _Invoice.objects.filter(
+                tenant_id=self.tenant_id,
+                invoice_number__startswith=self.NUMBER_PREFIX,
+            ).count()
+            # We use (existing + 1) for the sequence. After save, the row
+            # becomes the new "existing" for the next insert.
+            self.invoice_number = f"{self.NUMBER_PREFIX}{existing + 1:04d}"
+        super().save(*args, **kwargs)
 
     def recalc_totals(self, save: bool = True):
         """Recompute subtotal/tax/total from current line items."""
