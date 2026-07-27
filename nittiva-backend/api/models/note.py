@@ -20,9 +20,15 @@ class Note(models.Model):
         help_text="Tenant this note belongs to",
     )
 
-    # Generic attachment target: ("task" or "project") + uuid
+    # Generic attachment target. We use CharField (not UUIDField) because
+    # Task uses BigAutoField while Project uses UUIDField. The proper fix is
+    # to migrate to Django's `contenttypes` framework; for now we accept
+    # either type as a string. See migration 0017.
     content_type = models.CharField(max_length=20, help_text='"task" or "project"')
-    object_id = models.UUIDField(help_text="UUID of the task or project this note is attached to")
+    object_id = models.CharField(
+        max_length=64,
+        help_text="ID (UUID or int) of the task or project this note is attached to",
+    )
 
     # Content
     title = models.CharField(max_length=255, blank=True, default="")

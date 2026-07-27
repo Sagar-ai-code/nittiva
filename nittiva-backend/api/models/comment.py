@@ -16,9 +16,15 @@ class Comment(models.Model):
     # Multi-tenant
     tenant_id = models.UUIDField(null=True, blank=True, db_index=True, help_text="Tenant this comment belongs to")
 
-    # Generic foreign key to task or project
+    # Generic foreign key to task or project. We use CharField (not UUIDField)
+    # because Task uses BigAutoField while Project uses UUIDField. The proper
+    # fix is to migrate to Django's `contenttypes` framework; for now we
+    # accept either type as a string. See migration 0017.
     content_type = models.CharField(max_length=20)  # "task" or "project"
-    object_id = models.UUIDField()
+    object_id = models.CharField(
+        max_length=64,
+        help_text="ID (UUID or int) of the task or project this comment is attached to",
+    )
 
     # Comment content
     content = models.TextField()
