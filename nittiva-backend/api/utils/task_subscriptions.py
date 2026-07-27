@@ -95,7 +95,9 @@ def maybe_subscribe_on_note_or_comment(
     except Exception as e:  # noqa: BLE001
         # Subscription is best-effort. If the task doesn't exist or anything else fails,
         # we don't want to fail the whole note/comment creation.
-        logger.warning("Failed to auto-subscribe users to task %s: %s", object_id, e)
+        import traceback
+        logger.warning("Failed to auto-subscribe users to task %s: %s\n%s",
+                       object_id, e, traceback.format_exc())
 
 
 def notify_mentioned_users(
