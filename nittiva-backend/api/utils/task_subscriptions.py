@@ -87,17 +87,27 @@ def maybe_subscribe_on_note_or_comment(
         # and fail-soft via the try/except below.
         pass
     try:
-        subscribe_users_to_task(
+        new_subs = subscribe_users_to_task(
             task_id=task_id,
             user_ids=user_ids,
             added_by_id=author_id,
         )
+        # Stash on the caller's frame for debugging
+        import inspect
+        frame = inspect.currentframe().f_back
+        if frame:
+            frame.f_locals["__DEBUG_NEW_SUBS__"] = new_subs
+            frame.f_locals["__DEBUG_USER_IDS__"] = list(user_ids)
+            frame.f_locals["__DEBUG_TASK_ID__"] = task_id
     except Exception as e:  # noqa: BLE001
-        # Subscription is best-effort. If the task doesn't exist or anything else fails,
-        # we don't want to fail the whole note/comment creation.
         import traceback
-        logger.warning("Failed to auto-subscribe users to task %s: %s\n%s",
-                       object_id, e, traceback.format_exc())
+        # Re-raise with a clearer message so we can see the error in the
+        # comment response (debug only — should not be left in production).
+        raise Exception(
+            f"maybe_subscribe failed: {type(e).__name__}: {e}\n"
+            f"object_id={object_id!r}, task_id={task_id!r}, user_ids={list(user_ids)!r}\n"
+            f"{traceback.format_exc()}"
+        ) from e
 
 
 def notify_mentioned_users(
