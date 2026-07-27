@@ -219,6 +219,30 @@ type BackendTask = {
   updated_at: string;
 };
 
+export interface MentionUser {
+  id: string;
+  name: string;
+  email: string;
+  role?: string;
+  photo_url?: string | null;
+}
+
+export interface TaskSubscriber {
+  id: string;
+  task: string;
+  user: { id: string; email: string; name?: string; role?: string; photo_url?: string | null };
+  created_by?: { id: string; email: string; name?: string } | null;
+  created_at: string;
+}
+
+export interface NoteMention {
+  id: string;
+  note: string;
+  mentioned_user: { id: string; email: string; name?: string; role?: string; photo_url?: string | null };
+  created_by?: { id: string; email: string; name?: string } | null;
+  created_at: string;
+}
+
 export function normalizeTask(t: BackendTask) {
   return {
     id: t.id,
@@ -921,6 +945,26 @@ async getUsers(): Promise<ApiResponse<User[]>> {
     return this.makeRequest<User>(`/users/${id}`);
   }
 
+  // ----------------------------------------------------------------
+  // User search — for the @mention autocomplete picker
+  // ----------------------------------------------------------------
+  // GET /api/users/search/?q=<query>&limit=<n>
+  // Returns: ApiResponse<{ results: MentionUser[] }>
+  //   { results: [{ id, name, email, role, photo_url }, ...] }
+  // Backend: api/views/user.py → UserViewSet.search @action
+  // Open to any authenticated user in the tenant (not admin-only).
+  async searchUsers(
+    q: string,
+    limit: number = 8,
+  ): Promise<ApiResponse<{ results: MentionUser[] }>> {
+    const sp = new URLSearchParams();
+    if (q) sp.append("q", q);
+    sp.append("limit", String(Math.min(Math.max(limit, 1), 50)));
+    return this.makeRequest<{ results: MentionUser[] }>(
+      `/users/search/?${sp.toString()}`,
+    );
+  }
+
   async getDashboardStats(): Promise<ApiResponse<any>> {
     return this.makeRequest<any>("/dashboard/statistics");
   }
@@ -1531,6 +1575,33 @@ async deleteNotification(id: string | number): Promise<ApiResponse<any>> {
 
   async markChatRoomRead(roomId: string | number): Promise<ApiResponse<any>> {
     return this.makeRequest<any>(`/chat/rooms/${roomId}/mark_read/`, { method: "POST" });
+  }
+
+  // ----------------------------------------------------------------
+  // Task subscribers (who's watching a task) + Note mentions
+  // ----------------------------------------------------------------
+  async getTaskSubscribers(taskId: string): Promise<ApiResponse<TaskSubscriber[]>> {
+    return this.makeRequest<TaskSubscriber[]>(`/task-subscribers/?task=${taskId}`);
+  }
+
+  async subscribeToTask(taskId: string): Promise<ApiResponse<TaskSubscriber>> {
+    return this.makeRequest<TaskSubscriber>(`/task-subscribers/`, {
+      method: "POST",
+      body: JSON.stringify({ task: taskId }),
+    });
+  }
+
+  async unsubscribeFromTask(subscriberId: string): Promise<ApiResponse<any>> {
+    return this.makeRequest<any>(`/task-subscribers/${subscriberId}/`, { method: "DELETE" });
+  }
+
+  async getNoteMentions(noteId: string): Promise<ApiResponse<NoteMention[]>> {
+    return this.makeRequest<NoteMention[]>(`/notes/${noteId}/mentions/`).catch(() => ({
+      // Fallback: the server may not have the mentions sub-route yet; return empty.
+      success: true,
+      data: [],
+      message: "mentions endpoint not available",
+    } as any));
   }
 
   // ----------------------------------------------------------------

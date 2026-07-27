@@ -30,6 +30,7 @@ import {
   Check,
   Clock,
   CheckCircle2,
+  Eye,
 } from "lucide-react";
 import { apiService } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -53,6 +54,9 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { MentionInput, MentionText } from "@/components/mention";
+import { TaskSubscriber } from "@/lib/api";
+import { toast } from "sonner";
 
 interface TaskTag {
   id: string;
@@ -95,6 +99,17 @@ export default function TaskDetail() {
   const [sprints, setSprints] = useState<any[]>([]);
   const [loadingSprints, setLoadingSprints] = useState(false);
 
+  // Comments + subscribers state
+  const [comments, setComments] = useState<any[]>([]);
+  const [loadingComments, setLoadingComments] = useState(false);
+  const [postingComment, setPostingComment] = useState(false);
+  const [subscribers, setSubscribers] = useState<TaskSubscriber[]>([]);
+  const [loadingSubscribers, setLoadingSubscribers] = useState(false);
+  const currentUserId = (user as any)?.id != null ? String((user as any).id) : null;
+  const isCurrentUserSubscribed =
+    !!currentUserId &&
+    subscribers.some((s) => String(s.user?.id) === currentUserId);
+
   useEffect(() => {
     if (task) {
       setEditValues(task);
@@ -106,7 +121,7 @@ export default function TaskDetail() {
 
   const loadSprints = async () => {
     if (!task?.projectId) return;
-    
+
     setLoadingSprints(true);
     try {
       const response = await apiService.getSprints({ project: Number(task.projectId) });
@@ -120,6 +135,57 @@ export default function TaskDetail() {
       setLoadingSprints(false);
     }
   };
+
+  const loadComments = async () => {
+    if (!task?.id) return;
+    setLoadingComments(true);
+    try {
+      const response = await apiService.getComments("task", String(task.id));
+      if (response.success && response.data) {
+        const arr = Array.isArray(response.data)
+          ? response.data
+          : (response.data.results || []);
+        setComments(arr);
+      } else {
+        setComments([]);
+      }
+    } catch (error) {
+      console.error("Failed to load comments:", error);
+      setComments([]);
+    } finally {
+      setLoadingComments(false);
+    }
+  };
+
+  const loadSubscribers = async () => {
+    if (!task?.id) return;
+    setLoadingSubscribers(true);
+    try {
+      const response = await apiService.getTaskSubscribers(String(task.id));
+      if (response.success && response.data) {
+        const arr = Array.isArray(response.data)
+          ? response.data
+          : (response.data.results || []);
+        setSubscribers(arr);
+      } else {
+        setSubscribers([]);
+      }
+    } catch (error) {
+      console.error("Failed to load subscribers:", error);
+      setSubscribers([]);
+    } finally {
+      setLoadingSubscribers(false);
+    }
+  };
+
+  // Reload comments + subscribers when task changes
+  useEffect(() => {
+    if (task?.id) {
+      loadComments();
+      loadSubscribers();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task?.id]);
 
   if (!task) {
     return (
@@ -162,9 +228,55 @@ export default function TaskDetail() {
     });
   };
 
-  const addComment = () => {
-    if (!newComment.trim()) return;
-    setNewComment("");
+  const addComment = async () => {
+    if (!newComment.trim() || !task?.id) return;
+    setPostingComment(true);
+    try {
+      const response = await apiService.createComment({
+        content_type: "task",
+        object_id: String(task.id),
+        content: newComment.trim(),
+      });
+      if (response.success) {
+        setNewComment("");
+        // Backend will auto-subscribe the author and any mentioned users.
+        // Reload the comments list and the subscribers list.
+        await loadComments();
+        await loadSubscribers();
+        toast.success("Comment posted");
+      } else {
+        toast.error(response.message || "Failed to post comment");
+      }
+    } catch (error) {
+      console.error("Failed to post comment:", error);
+      toast.error("Failed to post comment");
+    } finally {
+      setPostingComment(false);
+    }
+  };
+
+  const toggleSubscribe = async () => {
+    if (!task?.id) return;
+    if (isCurrentUserSubscribed) {
+      const sub = subscribers.find(
+        (s) => String(s.user?.id) === currentUserId,
+      );
+      if (sub) {
+        const response = await apiService.unsubscribeFromTask(sub.id);
+        if (response.success) {
+          setSubscribers(subscribers.filter((s) => s.id !== sub.id));
+        } else {
+          toast.error(response.message || "Failed to unsubscribe");
+        }
+      }
+    } else {
+      const response = await apiService.subscribeToTask(String(task.id));
+      if (response.success && response.data) {
+        setSubscribers([...subscribers, response.data]);
+      } else {
+        toast.error(response.message || "Failed to subscribe");
+      }
+    }
   };
 
   const addTag = (tag: TaskTag) => {
@@ -884,64 +996,155 @@ export default function TaskDetail() {
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            <div className="space-y-3">
-              <div className="flex items-start gap-3">
-                <Avatar className="w-6 h-6">
-                  <AvatarFallback className="text-xs bg-blue-600 text-white">
-                    You
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs text-gray-400 mb-1">
-                    Yesterday at 4:35 pm
-                  </div>
-                  <div className="text-sm text-gray-300">
-                    <span className="text-white">You</span> updated the task
-                    description
-                  </div>
-                </div>
+            {/* Watchers / Subscribers */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs uppercase tracking-wider text-gray-500 flex items-center gap-1.5">
+                  <Eye className="w-3 h-3" />
+                  Watchers ({subscribers.length})
+                </h4>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={toggleSubscribe}
+                  className={
+                    "h-6 px-2 text-xs " +
+                    (isCurrentUserSubscribed
+                      ? "text-accent hover:text-accent/80"
+                      : "text-gray-400 hover:text-white")
+                  }
+                >
+                  {isCurrentUserSubscribed ? "Unwatch" : "Watch"}
+                </Button>
               </div>
+              <div className="flex flex-wrap gap-1.5">
+                {loadingSubscribers ? (
+                  <span className="text-xs text-gray-500">Loading…</span>
+                ) : subscribers.length === 0 ? (
+                  <span className="text-xs text-gray-500">No watchers yet</span>
+                ) : (
+                  subscribers.map((s) => {
+                    const u = s.user;
+                    const initials = (u?.name || u?.email || "?")
+                      .split(/\s+/)
+                      .map((p: string) => p[0])
+                      .filter(Boolean)
+                      .slice(0, 2)
+                      .join("")
+                      .toUpperCase() || "?";
+                    return (
+                      <div
+                        key={s.id}
+                        title={`${u?.name || u?.email}${u?.email ? ` <${u.email}>` : ""}`}
+                        className="flex items-center gap-1.5 bg-dashboard-bg rounded-full pl-1 pr-2 py-0.5"
+                      >
+                        <Avatar className="w-5 h-5">
+                          {u?.photo_url ? (
+                            <img
+                              src={u.photo_url}
+                              alt={u?.name}
+                              className="w-full h-full object-cover rounded-full"
+                            />
+                          ) : (
+                            <AvatarFallback className="text-[10px] bg-accent/30 text-white">
+                              {initials}
+                            </AvatarFallback>
+                          )}
+                        </Avatar>
+                        <span className="text-xs text-gray-300 truncate max-w-[120px]">
+                          {u?.name || u?.email}
+                        </span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
 
-              <div className="flex items-start gap-3">
-                <Avatar className="w-6 h-6">
-                  <AvatarFallback className="text-xs bg-green-600 text-white">
-                    SM
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs text-gray-400 mb-1">
-                    Yesterday at 4:35 pm
-                  </div>
-                  <div className="text-sm text-gray-300">
-                    <span className="text-white">Sagar Mantry</span> created
-                    this task
-                  </div>
+            <Separator className="bg-dashboard-border" />
+
+            {/* Comments / Activity */}
+            <div className="space-y-3">
+              <h4 className="text-xs uppercase tracking-wider text-gray-500">
+                Comments ({comments.length})
+              </h4>
+              {loadingComments ? (
+                <div className="text-xs text-gray-500">Loading comments…</div>
+              ) : comments.length === 0 ? (
+                <div className="text-xs text-gray-500">
+                  No comments yet. Be the first to add one below.
                 </div>
-              </div>
+              ) : (
+                comments.map((c) => {
+                  const author = c.author;
+                  const initials = (author?.name || author?.email || "?")
+                    .split(/\s+/)
+                    .map((p: string) => p[0])
+                    .filter(Boolean)
+                    .slice(0, 2)
+                    .join("")
+                    .toUpperCase() || "?";
+                  return (
+                    <div key={c.id} className="flex items-start gap-3">
+                      <Avatar className="w-6 h-6 shrink-0">
+                        {author?.photo_url ? (
+                          <img
+                            src={author.photo_url}
+                            alt={author?.name}
+                            className="w-full h-full object-cover rounded-full"
+                          />
+                        ) : (
+                          <AvatarFallback className="text-xs bg-accent/30 text-white">
+                            {initials}
+                          </AvatarFallback>
+                        )}
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs text-gray-400 mb-1">
+                          <span className="text-white font-medium">
+                            {author?.name || author?.email || "Unknown"}
+                          </span>{" "}
+                          · {new Date(c.created_at).toLocaleString()}
+                        </div>
+                        <div className="text-sm text-gray-300 break-words">
+                          <MentionText text={c.content || ""} />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
 
-          <div className="p-4 border-t border-dashboard-border">
-            <div className="flex items-center gap-2">
-              <Input
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                placeholder="Write a comment..."
-                className="flex-1 bg-dashboard-bg border-dashboard-border text-white text-sm h-8"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    addComment();
-                  }
-                }}
-              />
+          <div className="p-4 border-t border-dashboard-border space-y-2">
+            <MentionInput
+              value={newComment}
+              onChange={setNewComment}
+              placeholder="Write a comment... use @ to mention a teammate"
+              rows={3}
+              className="text-sm"
+              disabled={postingComment}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  addComment();
+                }
+              }}
+            />
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] text-gray-500">
+                <kbd className="px-1 bg-dashboard-bg border border-dashboard-border rounded">Enter</kbd>{" "}
+                to post · <kbd className="px-1 bg-dashboard-bg border border-dashboard-border rounded">Shift+Enter</kbd>{" "}
+                for new line
+              </p>
               <Button
                 onClick={addComment}
-                disabled={!newComment.trim()}
+                disabled={!newComment.trim() || postingComment}
                 size="sm"
-                className="bg-accent text-black hover:bg-accent/90 disabled:opacity-50 h-8 px-3"
+                className="bg-accent text-black hover:bg-accent/90 disabled:opacity-50 h-7 px-3"
               >
-                Send
+                {postingComment ? "Posting…" : "Send"}
               </Button>
             </div>
           </div>

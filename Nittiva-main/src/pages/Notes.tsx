@@ -35,6 +35,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { apiService } from "@/lib/api";
 import { toast } from "sonner";
+import { MentionInput, MentionText } from "@/components/mention";
 
 interface Note {
   id: string;
@@ -330,15 +331,19 @@ export default function Notes() {
                   </div>
                   <div>
                     <Label className="text-sm text-gray-400">Content *</Label>
-                    <Textarea
+                    <MentionInput
                       value={newNote.content}
-                      onChange={(e) =>
-                        setNewNote({ ...newNote, content: e.target.value })
+                      onChange={(v) =>
+                        setNewNote({ ...newNote, content: v })
                       }
-                      className="bg-dashboard-bg border-dashboard-border text-white resize-none"
-                      placeholder="Write your note content here..."
+                      placeholder="Write your note content here... use @ to mention a teammate"
                       rows={8}
+                      className="bg-dashboard-bg border-dashboard-border text-white"
+                      autoFocus
                     />
+                    <p className="text-[11px] text-gray-500 mt-1">
+                      Type <code className="text-gray-400">@</code> to mention a teammate — they'll be auto-subscribed to this note.
+                    </p>
                   </div>
                   <div>
                     <Label className="text-sm text-gray-400">Color</Label>
@@ -524,16 +529,17 @@ export default function Notes() {
                 </div>
                 <div>
                   <Label className="text-sm text-gray-400">Content *</Label>
-                  <Textarea
+                  <MentionInput
                     value={editingNote.content}
-                    onChange={(e) =>
+                    onChange={(v) =>
                       setEditingNote({
                         ...editingNote,
-                        content: e.target.value,
+                        content: v,
                       })
                     }
-                    className="bg-dashboard-bg border-dashboard-border text-white resize-none"
+                    placeholder="Edit your note... use @ to mention a teammate"
                     rows={8}
+                    className="bg-dashboard-bg border-dashboard-border text-white"
                   />
                 </div>
                 <div>
@@ -685,7 +691,7 @@ function NoteCard({
               : "text-gray-300"
           }`}
         >
-          {truncateContent(note.content, viewMode === "list" ? 200 : 150)}
+          <MentionText text={truncateContent(note.content, viewMode === "list" ? 200 : 150)} />
         </p>
 
         <div

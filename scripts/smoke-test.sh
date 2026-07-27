@@ -105,6 +105,8 @@ check "GET /invoices/"       200 GET "$API_URL/invoices/"               "" "$TOK
 echo
 echo "Round 6 - Mentions + Task Subscribers"
 check "GET /task-subscribers/" 200 GET "$API_URL/task-subscribers/"     "" "$TOKEN"
+check "GET /users/search/?q=admin" 200 GET "$API_URL/users/search/?q=admin&limit=5" "" "$TOKEN"
+check "GET /users/search/ (no q)" 200 GET "$API_URL/users/search/?limit=5"          "" "$TOKEN"
 
 # Sanity: pre-existing viewsets
 echo
