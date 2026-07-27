@@ -243,6 +243,20 @@ export interface NoteMention {
   created_at: string;
 }
 
+/**
+ * V-1 (Vikram) — one row in the task activity log.
+ * The `diff` is a free-form JSONField; the UI interprets it based on `verb`.
+ */
+export interface TaskHistoryEntry {
+  id: string;
+  task: string;
+  actor: { id: string; email: string; name?: string; role?: string; photo_url?: string | null } | null;
+  actor_id: number | null;
+  verb: "created" | "updated" | "assigned" | "unassigned" | "commented" | "noted";
+  diff: Record<string, any>;
+  created_at: string;
+}
+
 export function normalizeTask(t: BackendTask) {
   return {
     id: t.id,
@@ -1347,9 +1361,24 @@ async deleteProject(id: number): Promise<ApiResponse<any>> {
     const queryParams = new URLSearchParams();
     if (params?.start_date) queryParams.append("start_date", params.start_date);
     if (params?.end_date) queryParams.append("end_date", params.end_date);
-    
+
     const query = queryParams.toString();
     return this.makeRequest<any>(`/time-logs/agents_summary/${query ? `?${query}` : ""}`);
+  }
+
+  /**
+   * V-1 admin-visibility: list every agent who is currently working (active timer).
+   * Returns one row per agent with task + duration. Powers the
+   * "Currently working" panel in the manager dashboard.
+   */
+  async getActiveTimers(): Promise<ApiResponse<Array<{
+    id: string;
+    user: { id: number; email: string; name: string; role: string };
+    task: { id: number; title: string; status: string } | null;
+    started_at: string;
+    duration_seconds: number;
+  }>>> {
+    return this.makeRequest<any>("/time-logs/active_timers/");
   }
 
   // Legacy Time Tracker methods (for backward compatibility)
@@ -1593,6 +1622,15 @@ async deleteNotification(id: string | number): Promise<ApiResponse<any>> {
 
   async unsubscribeFromTask(subscriberId: string): Promise<ApiResponse<any>> {
     return this.makeRequest<any>(`/task-subscribers/${subscriberId}/`, { method: "DELETE" });
+  }
+
+  /**
+   * V-1 (Vikram) — Task history / activity log.
+   * Returns the rows that drive the right sidebar in the task detail UI.
+   * Each row has: id, task, actor (expanded user), verb, diff (JSON), created_at.
+   */
+  async getTaskHistory(taskId: number | string): Promise<ApiResponse<TaskHistoryEntry[]>> {
+    return this.makeRequest<TaskHistoryEntry[]>(`/tasks/${taskId}/history/`);
   }
 
   async getNoteMentions(noteId: string): Promise<ApiResponse<NoteMention[]>> {

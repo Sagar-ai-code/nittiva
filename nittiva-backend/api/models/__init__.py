@@ -8,7 +8,7 @@ from .tenant import Tenant
 from .user import User, UserManager
 from .client import Client
 from .project import Project, ProjectMember
-from .task import Task, TaskAssignment, TaskSubscriber
+from .task import Task, TaskAssignment, TaskSubscriber, TaskHistory
 from .invitation import Invitation
 from .goal import Goal, GoalLinkedEntity
 from .comment import Comment, CommentMention

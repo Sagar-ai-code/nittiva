@@ -185,19 +185,71 @@ class TimeLogViewSet(viewsets.ModelViewSet):
         tenant_id = get_current_tenant_id(request)
         if not tenant_id:
             raise ValidationError("Tenant not found.")
-        
+
         active_timer = TimeLog.objects.filter(
             tenant_id=tenant_id,
             user=request.user,
             ended_at__isnull=True
         ).first()
-        
+
         if active_timer:
             return success_response(
                 data=TimeLogSerializer(active_timer).data
             )
         else:
             return success_response(data=None, message="No active timer")
+
+    @action(detail=False, methods=["get"], url_path="active_timers")
+    def active_timers(self, request):
+        """List ALL active timers in the tenant (managers / staff only).
+
+        Powers the "who's working on what right now" panel in the manager
+        dashboard. Returns one row per agent with an active timer:
+          {id, user: {id, email, name, role}, task: {id, title, status},
+           started_at, duration_seconds}
+
+        Regular agents can still call this; they just see their own row.
+        """
+        tenant_id = get_current_tenant_id(request)
+        if not tenant_id:
+            raise ValidationError("Tenant not found.")
+
+        qs = TimeLog.objects.filter(
+            tenant_id=tenant_id,
+            ended_at__isnull=True,
+        ).select_related("user", "task")
+
+        user = request.user
+        is_manager = (
+            getattr(user, "is_staff", False)
+            or getattr(user, "is_superuser", False)
+            or getattr(user, "role", None) == "manager"
+        )
+        if not is_manager:
+            qs = qs.filter(user=user)
+
+        now = timezone.now()
+        rows = []
+        for tl in qs.order_by("-started_at"):
+            duration = int((now - tl.started_at).total_seconds())
+            rows.append({
+                "id": str(tl.id),
+                "user": {
+                    "id": tl.user_id,
+                    "email": tl.user.email,
+                    "name": getattr(tl.user, "name", "")
+                        or f"{getattr(tl.user, 'first_name', '')} {getattr(tl.user, 'last_name', '')}".strip(),
+                    "role": getattr(tl.user, "role", ""),
+                },
+                "task": {
+                    "id": tl.task_id,
+                    "title": tl.task.title if tl.task_id else None,
+                    "status": tl.task.status if tl.task_id else None,
+                } if tl.task_id else None,
+                "started_at": tl.started_at,
+                "duration_seconds": duration,
+            })
+        return success_response(data=rows)
     
     @action(detail=False, methods=["get"])
     def summary(self, request):

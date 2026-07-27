@@ -41,7 +41,10 @@ export default function TimeTracking() {
   const { projects } = useProject();
   const { user } = useAuth();
   const isAgent = (user as any)?.role === "agent";
-  const isManager = (user as any)?.role === "manager";
+  const isManager =
+    (user as any)?.role === "manager" ||
+    (user as any)?.is_staff ||
+    (user as any)?.is_superuser;
   const [selectedPeriod, setSelectedPeriod] = useState("today");
   const [selectedProject, setSelectedProject] = useState("all");
 

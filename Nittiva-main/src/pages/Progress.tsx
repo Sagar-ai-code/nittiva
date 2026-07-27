@@ -22,7 +22,10 @@ interface TimeLogEntry {
 
 export default function Progress() {
   const { user } = useAuth();
-  const isManager = (user as any)?.role === "manager";
+  const isManager =
+    (user as any)?.role === "manager" ||
+    (user as any)?.is_staff ||
+    (user as any)?.is_superuser;
   const isAgent = (user as any)?.role === "agent";
   
   // Agent-specific state

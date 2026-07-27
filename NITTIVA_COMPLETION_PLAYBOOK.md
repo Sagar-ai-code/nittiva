@@ -1,177 +1,211 @@
-# Nittiva — Completion Playbook
+# Nittiva — Agent Completion Playbook (v2)
 
-> **For**: The 5 agents (Priya, Arjun, Neha, Vikram, Aisha) and Sagar.
-> **Prepared by**: Mavis (MiniMax Code agent) on 2026-07-28.
-> **Live state**: Backend on `https://nittiva-backend.onrender.com/api`, frontend on `https://nittiva-frontend.vercel.app`.
-> **This document** is the single source of truth for what each agent owns and how to ship it. The same content is also in the Nittiva project **"Complete Nittiva"** as one task per agent.
-
----
-
-## 1. The team
-
-Five manager-level agents are seeded in Nittiva with `User.role = "manager"` and added as members of the project **"Complete Nittiva"**. All have the same dummy password (`TempPass123!`) — rotate before sharing with anyone outside the team.
-
-| # | Name | Email | Role | Owns |
-|---|------|-------|------|------|
-| 1 | Priya Sharma | `priya.sharma@halfmind.co` | Manager | Frontend — wire Chat.tsx and Invoice.tsx pages |
-| 2 | Arjun Reddy  | `arjun.reddy@halfmind.co`  | Manager | Frontend — invite-by-email picker (OpenProject pattern) |
-| 3 | Neha Kapoor  | `neha.kapoor@halfmind.co`  | Manager | Backend — per-tenant invoice numbering |
-| 4 | Vikram Patel | `vikram.patel@halfmind.co` | Manager | Backend — TaskHistory / activity log + on-assign notifications |
-| 5 | Aisha Khan   | `aisha.khan@halfmind.co`   | Manager | QA — pytest test coverage for the new viewsets |
-
-Login: `https://nittiva-frontend.vercel.app` → any of the emails above → password `TempPass123!`.
+> **For**: The 5 manager agents + Sagar (admin). **This is the prompt each agent runs against.**
+> **Prepared by**: Mavis (MiniMax Code) on 2026-07-28. **Last edit**: 2026-07-28 (round 6 follow-up).
+> **Live state**: Backend `https://nittiva-backend.onrender.com/api`, frontend `https://nittiva-frontend.vercel.app`.
+> **Companion doc**: `NITTIVA_AGENT_TASK_MAP.md` (the full 16-task plan, dependencies, execution order).
+> **Map of changes shipped so far**: `NITTIVA_CHANGES.md` (consultant review).
 
 ---
 
-## 2. Repo conventions (read this first)
+## 0. How to use this playbook
 
-- **Backend**: `nittiva-backend/api/` — Django 5.0.6 + DRF, multi-tenant via `X-Company-ID` (or `X-Tenant-Subdomain`) header, JWT auth.
-- **Frontend**: `Nittiva-main/src/` — React 18 + Vite + TypeScript. New pages go in `src/pages/`, reusable components in `src/components/`.
-- **Migrations**: numbered (e.g. `0013_note_todo_meeting.py`). Hand-written is fine; run `python manage.py makemigrations --dry-run` and match what Django would generate. The cosmetic diffs matter less than functional equivalence.
-- **Smoke test**: `scripts/smoke-test.sh` — runs 28+ checks against the live API. Run it after every deploy. **Never** declare a round done if the smoke test regresses.
-- **Naming**:
-  - Backend model: `PascalCase` (e.g. `NoteMention`)
-  - Backend file: `snake_case.py` (e.g. `api/models/note.py`)
-  - Frontend component: `PascalCase.tsx` (e.g. `MentionInput.tsx`)
-  - Frontend type: `PascalCase` (e.g. `MentionUser`)
-- **Don't**: edit `.env.example` with real credentials. Use `getpass` / env vars / Render dashboard. (Round 1 already scrubbed a leaked SMTP password — don't reintroduce that pattern.)
-- **TypeScript types must match backend response shapes**: `Note/Comment/TaskSubscriber` IDs are UUIDs (`id: string`); `User` ID is a bigint (`id: number`). Keep these in sync — see `Nittiva-main/src/lib/api.ts`.
+Each agent is invoked with **one of the runbooks in §3** plus their own login credentials (§2). The runbook is self-contained: it says what to do, what files to touch, how to verify, how to ship. The agent should **not** need to come back to the playbook except to look up a spec.
 
----
+**Admin (Sagar) tracks all agent work from `admin@nittiva.local`**:
+- `/api/time-logs/` — every agent's timer (active, stopped, durations)
+- `/api/comments/?task=<id>` — every agent's comment on a task
+- `/api/notifications/unread_count/` — aggregate activity signal
+- `/api/users/?role=manager` — the roster
+- `/api/projects/2/` — the "Complete Nittiva" project
+- `/api/tasks/?project=2` — the 14 in-flight tasks
 
-## 3. Per-agent step-by-step
-
-Each task is in the **Complete Nittiva** project. The full description is in the task body in Nittiva; this section is the executive summary + key file paths.
-
-### 3.1 Priya Sharma — Wire Chat.tsx and Invoice.tsx (2 tasks)
-
-**Task #3 — Wire `Chat.tsx` to the backend API**
-
-- **What exists**: `api/views/chat.py` with `ChatRoomViewSet` + `ChatMessageViewSet`; `apiService.getChatRooms / getChatMessages / sendChatMessage / markChatRoomRead` already declared.
-- **What's missing**: `Nittiva-main/src/pages/Chat.tsx` still uses a local `mockData` array.
-- **Steps**:
-  1. Read `pages/Chat.tsx` and the API at `/api/chat/rooms/` (and `/api/chat/rooms/<id>/messages/`).
-  2. Swap `mockData` for a `useEffect` + `useState` pattern: load rooms on mount, load messages when a room is selected.
-  3. `handleSendMessage` → `apiService.sendChatMessage(roomId, content)` then refresh.
-  4. "Create room" dialog → `apiService.createChatRoom({ name, participant_ids, is_group })`.
-  5. `apiService.markChatRoomRead(roomId)` when opening a room.
-  6. Show the `unread_count` badge (already in the API response) on each room.
-- **Acceptance**: Two users, two browsers, send a message back and forth, unread count clears on open.
-
-**Task #4 — Wire `Invoice.tsx` to the backend API (this is a rewrite, not a port)**
-
-- **Why it's hard**: the current page (1631 lines) uses a flat-field model (`clientName`, `clientEmail`, etc.) that doesn't map to the backend's FK-based model. You need a proper rewrite, not a port.
-- **What exists**: `api/views/invoice.py` with `InvoiceViewSet` (CRUD + `mark_paid` / `mark_sent` / `pdf`); `apiService.{getInvoices, createInvoice, updateInvoice, deleteInvoice, markInvoicePaid, markInvoiceSent, downloadInvoicePdf}`.
-- **Steps**:
-  1. Read `pages/Invoice.tsx` and `api/serializers/invoice.py` (the writable nested `line_items` shape).
-  2. Use the Plane/Linear pattern: sidebar with status filters, main panel with the invoice detail.
-  3. List: `useEffect` + `apiService.getInvoices({ status, client })` → table.
-  4. Detail/edit: `useState` for draft, hydrate from `apiService.getInvoice(id)`.
-  5. Save: `apiService.createInvoice({ client, line_items: [...] })` — server recomputes subtotal/tax/total; don't send them.
-  6. PDF: `apiService.downloadInvoicePdf(id)` returns a Blob; render as `<a href={URL.createObjectURL(blob)} download="invoice-N.pdf">`.
-  7. Mark paid/sent buttons call the corresponding methods.
-- **Acceptance**: Create an invoice with 2 line items → server returns the recomputed total; mark paid/sent; download a real PDF.
-
-### 3.2 Arjun Reddy — Invite-by-email from assignee picker
-
-**Task #5 — OpenProject-style "Invite by email" from the TaskDetail assignee picker**
-
-- **Why it matters**: today, adding a teammate to a project requires leaving the task, going to `/dashboard/users`, creating the user, and coming back. The OpenProject pattern lets you type an email directly in the assignee dropdown and send a one-time signup link. This is the killer UX of 2026.
-- **Steps**:
-  1. **Backend** — add `Invitation` model (`api/models/invitation.py`): `id`, `tenant_id`, `email`, `role`, `project` (optional FK), `token` (UUID, unique), `expires_at`, `accepted_at`, `invited_by`.
-  2. **Backend** — `POST /api/invitations/` creates the Invitation and best-effort emails a link like `https://<frontend>/invite/<token>/`. If SMTP is unconfigured, return the URL in the response so the UI can show it as a copyable link (Wekan pattern).
-  3. **Backend** — `GET /api/invitations/<token>/` returns the invitation payload (email, role, project name) — used by the public signup page.
-  4. **Backend** — `POST /api/invitations/accept/<token>/` creates a User with the given email + a password the user supplies, marks invitation accepted, adds them to the project.
-  5. **Frontend** — extend the assignee picker in `pages/TaskDetail.tsx`: when the user types a string that doesn't match any existing user, show an "Invite `<email>`" row that calls `apiService.createInvitation({ email, role: 'user' })`.
-  6. **Frontend** — toast: "Invitation sent to `<email>`. They'll get a link to join." (or, if SMTP is down, show the copyable link).
-  7. **Frontend** — public route at `/invite/<token>` (no auth) with email pre-filled and a password field.
-- **Acceptance**: Type a fake email in the assignee picker → "Invite `<email>`" row appears; click it; open the link in incognito; signup; the new user is in the project and can be assigned.
-- **Reference**: `NITTIVA_MENTION_RESEARCH.md` §3.
-
-### 3.3 Neha Kapoor — Per-tenant invoice numbering
-
-**Task #6 — `Invoice.invoice_number` unique per tenant + auto-increment**
-
-- **Why**: today two tenants can't both have `INV-0001` because the column is a global `CharField`. Consultant flagged this in feedback #2.
-- **Steps**:
-  1. **Migration** `0018_invoice_per_tenant_unique.py`:
-     - `migrations.AlterUniqueTogether(name='invoice', unique_together={('tenant_id', 'invoice_number')})` **or** `models.UniqueConstraint(fields=['tenant_id', 'invoice_number'], name='uniq_invoice_per_tenant')` + `migrations.AddConstraint(...)`.
-  2. **Auto-increment** — override `Invoice.save()` (or use a `pre_save` signal) to set `invoice_number` to the next available value for the tenant if not provided:
-     ```python
-     prefix = "INV-"
-     next_n = Invoice.objects.filter(tenant_id=tenant_id).count() + 1
-     invoice_number = f"{prefix}{next_n:04d}"  # e.g. "INV-0001"
-     ```
-  3. **API** — make sure `InvoiceSerializer` doesn't accept a custom `invoice_number` from the client; always auto-generate. (Today the serializer just stores what's sent.)
-  4. **Backfill** — write a one-off data migration (or management command) that backfills `invoice_number` for any existing rows.
-  5. **Test** — log in as two tenants, create an invoice in each → both have `INV-0001` (no collision).
-- **Reference**: consultant feedback #2 in `NITTIVA_CHANGES.md` §Known issues.
-
-### 3.4 Vikram Patel — TaskHistory / activity log + on-assign notifications
-
-**Task #7 — Every change to a Task writes a history row; assignee changes fire a notification**
-
-- **Why**: the "Activity" sidebar in `TaskDetail` is currently hardcoded mock data ("Sagar Mantry created this task"). Plane and Linear both have rich activity feeds. This is the difference between "tracker" and "real product".
-- **Steps**:
-  1. **Backend model** — add `TaskHistory` in `api/models/task.py`: `id` (UUID), `tenant_id`, `task` (FK), `actor` (FK to User), `verb` (e.g. `created` / `updated` / `assigned` / `status_changed`), `diff` (JSONField like `{"status": ["to-do", "in-progress"]}`), `created_at`.
-  2. **Backend view** — extend `TaskViewSet.perform_update` to detect changes and write a history row:
-     - On any change: write a row with the diff
-     - On assignee change: also call `Notification.objects.create(recipient=new_assignee, type='info', title='You were assigned to <task name>', link=f'/dashboard/tasks/<id>')`
-  3. **Backend view** — `GET /api/tasks/<id>/history/` returns the rows.
-  4. **Frontend** — `apiService.getTaskHistory(taskId)`.
-  5. **Frontend** — replace the hardcoded mock activity list in `TaskDetail.tsx` with a `useEffect` that loads history; render each row as "<actor> changed <field> from X to Y" or "<actor> created this task".
-  6. **Frontend** — the activity sidebar should poll every 30s OR use a websocket (out of scope for v1 — just polling).
-- **Acceptance**: Change a task's status `to-do` → `in-progress` → `completed` → reload → see 3 history rows. Add an assignee → assignee gets a Notification row, sees it in the bell icon.
-- **Reference**: Plane's `apps/api/schema/issue/issue_activity.py` (cloned at `~/.minimax/workspace/research/plane`).
-
-### 3.5 Aisha Khan — pytest test coverage
-
-**Task #8 — Add minimal happy-path tests for each new viewset**
-
-- **Why**: zero tests exist today. The Round 6 e2e rollout found 3 bugs (object_id type mismatch, TaskSubscriberSerializer dropping user kwarg, maybe_subscribe not threading tenant_id) that the GET-only smoke test would have missed. Tests are the safety net.
-- **Steps**:
-  1. **Setup** — add `pytest`, `pytest-django`, `pytest-cov` to `requirements.txt`. Create `pytest.ini` and `conftest.py` with a fixture that:
-     - Creates a `Tenant` + `User` with superuser flag
-     - Sets `request.tenant` and `request.tenant_id` via the middleware
-     - Returns a DRF `APIClient` with the token
-  2. **Smoke test** — for each new viewset, write one test that hits `GET /api/<viewset>/` and asserts a 200 with a non-empty list: `NoteViewSet`, `TodoViewSet`, `MeetingViewSet`, `LeaveRequestViewSet`, `NotificationViewSet`, `ChatRoomViewSet`, `InvoiceViewSet`, `TaskSubscriberViewSet`, `UserViewSet` (new search action).
-  3. **CRUD test** — for each viewset, write one test that creates an instance, lists it, and deletes it. Verify the response shape matches what the frontend expects (UUIDs for `Note/Todo/Meeting/Comment/TaskSubscriber`; bigint for `User` id).
-  4. **@mention test** — post a comment with `@<other_user.name>`, verify:
-     - `CommentMention` row exists
-     - `TaskSubscriber` rows include the author and the mentioned user
-     - `Notification` row exists for the mentioned user (not the actor)
-  5. **CI hook** — add a `.github/workflows/test.yml` that runs pytest on every push to `main`.
-- **Acceptance**: `pytest -q` passes locally; coverage report shows the 8 new viewsets covered (target: 70% line coverage on the new files); the smoke test `scripts/smoke-test.sh` keeps passing.
+Admin visibility is built in. No work happens off the radar.
 
 ---
 
-## 4. After each task
+## 1. The 5 agents (by area of expertise)
 
-1. Run `scripts/smoke-test.sh` — should still be 28/28+ green. New endpoints deserve a new check.
-2. `git commit -m "<type>(<scope>): <what>"` — match the existing style (look at `git log --oneline` for examples). Examples: `feat(frontend): wire Chat.tsx to backend API`, `fix(backend): per-tenant invoice numbering`.
-3. `git push origin main` — Vercel auto-deploys the frontend. For backend changes, fire the Render deploy hook:
-   ```bash
-   curl -X POST "https://api.render.com/deploy/srv-d9ij4i4m0tmc73csuc3g?key=O4BZhDo2MR0"
-   ```
-   (Rotate this key after Round 7 — it's exposed in chat history.)
-4. Wait for the deploy to land (2-3 min) and re-run the smoke test.
+| Agent | Email | Password | Expertise | Runs in Mavis as |
+|---|---|---|---|---|
+| **Priya Sharma** | `priya.sharma@halfmind.co` | `TempPass123!` | **Frontend** — React 18 + Vite + TS, page components, the @mention dropdown, mocking → API wiring | `general` agent |
+| **Arjun Reddy** | `arjun.reddy@halfmind.co` | `TempPass123!` | **Auth + invite** — registration, login, password reset, invitations, public routes, SMTP wiring | `general` agent |
+| **Neha Kapoor** | `neha.kapoor@halfmind.co` | `TempPass123!` | **Billing** — invoices, clients, money, tax, PDF, per-tenant auto-numbering | `general` agent |
+| **Vikram Patel** | `vikram.patel@halfmind.co` | `TempPass123!` | **Workflow** — task history, activity log, notifications, real-time, on-event side effects | `general` agent |
+| **Aisha Khan** | `aisha.khan@halfmind.co` | `TempPass123!` | **QA + Infra** — pytest, CI, deploy, observability, DB persistence | `general` agent |
 
----
-
-## 5. After all 5 tasks are done
-
-- Sagar walks through the consultant review (`NITTIVA_CHANGES.md`) and either signs off or flags new items.
-- The 5 agents get rotated to a real auth flow (the current `TempPass123!` is throwaway).
-- The 5 dummy emails get replaced with the actual team emails when the agency hires them.
-- A new round of tasks can be seeded using the same pattern (project + agents + tasks).
+> **Mavis runs each agent's work** in a `general` sub-agent. Each invocation gets one runbook from §3, logs in with the credentials above, does the work, posts progress, ships. **Mavis does NOT log in as the agent**; the agent does. This keeps the audit trail clean (time logs, comments).
 
 ---
 
-## 6. Reference files
+## 2. Login protocol (the agent's "morning routine")
 
-- `NITTIVA_AUDIT.md` — the original 6-issue audit
-- `NITTIVA_CHANGES.md` — what's been changed so far (Rounds 1-6), with the consultant's open items
-- `NITTIVA_MENTION_RESEARCH.md` — UX patterns from Plane / Taiga / OpenProject / Wekan, plus the invite-by-email design
-- `scripts/smoke-test.sh` — the live-API integration test
-- `~/.minimax/workspace/research/plane` — local clone of Plane (49K+ stars, the closest reference)
-- Plane's `apps/web/core/hooks/editor/use-editor-mention.tsx` — the Tiptap mention picker (not used in v1 but useful for v2)
+Before touching code, every agent does this:
+
+```bash
+API="https://nittiva-backend.onrender.com/api"
+LOGIN=$(curl -sS -m 20 -X POST "$API/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"YOUR_EMAIL","password":"TempPass123!"}')
+TOKEN=$(echo "$LOGIN" | jq -r '.data.access')
+COMPANY=$(echo "$LOGIN" | jq -r '.data.user.company_id')
+# Confirm the company is "5DOUOXNB" (the shared admin tenant).
+```
+
+Then for **every** task the agent picks up:
+
+```bash
+# 1. Get the task's current state (id is from /tmp/nittiva-state.sh or the task list)
+curl -sS "$API/tasks/$TASK_ID/" -H "Authorization: Bearer $TOKEN" -H "X-Company-ID: $COMPANY"
+
+# 2. Start a timer
+TIMER=$(curl -sS -X POST "$API/time-logs/start_timer/" \
+  -H "Authorization: Bearer $TOKEN" -H "X-Company-ID: $COMPANY" \
+  -H "Content-Type: application/json" -d "{\"task_id\":$TASK_ID}")
+TIMER_ID=$(echo "$TIMER" | jq -r '.data.id')
+
+# 3. Post a "starting" comment with an ETA
+curl -sS -X POST "$API/comments/" \
+  -H "Authorization: Bearer $TOKEN" -H "X-Company-ID: $COMPANY" \
+  -H "Content-Type: application/json" \
+  -d "$(jq -nc --arg t "$TASK_ID" --arg c "Starting work on this task. ETA: ~75 min. I'll post again when it's done." '{task: $t, content: $c, object_id: $t, content_type: "tasks.task"}')"
+```
+
+After the work is done and shipped:
+
+```bash
+# 4. Post a "done" comment
+curl -sS -X POST "$API/comments/" \
+  -H "Authorization: Bearer $TOKEN" -H "X-Company-ID: $COMPANY" \
+  -H "Content-Type: application/json" \
+  -d "$(jq -nc --arg t "$TASK_ID" --arg c "Done. Shipped in commit X. Smoke test Y/28. ETA met." '{task: $t, content: $c, object_id: $t, content_type: "tasks.task"}')"
+
+# 5. Stop the timer
+curl -sS -X POST "$API/time-logs/$TIMER_ID/stop_timer/" \
+  -H "Authorization: Bearer $TOKEN" -H "X-Company-ID: $COMPANY"
+
+# 6. Mark the task completed
+curl -sS -X PATCH "$API/tasks/$TASK_ID/" \
+  -H "Authorization: Bearer $TOKEN" -H "X-Company-ID: $COMPANY" \
+  -H "Content-Type: application/json" -d '{"status":"completed"}'
+```
+
+Admin sees all of this in `/api/time-logs/` and on the task detail.
+
+---
+
+## 3. The 14 in-flight tasks (one runbook each)
+
+> **Status legend**: ✅ done · 🟡 in progress · ⚪ pending
+> **Owner**: each task is assigned to one of the 5 agents by area of expertise.
+> **Spec**: every task has a full spec in `NITTIVA_AGENT_TASK_MAP.md` (referenced by ID, e.g. "§A-1"). This playbook is the executive summary; the map is the deep dive.
+
+### 🔵 Priya (4 tasks) — Frontend
+
+| ID | Title | Status | ETA | Spec |
+|---|---|---|---|---|
+| **P-1** | Wire `pages/Chat.tsx` to the chat API (`/api/chat/rooms/`, `/api/chat/rooms/<id>/messages/`) | ⚪ | 60m | map §P-1 |
+| **P-2** | Rewrite `pages/Invoice.tsx` to use the FK-based backend (this is a rewrite, not a port) | ⚪ | 90m | map §P-2 |
+| **P-3** | Inline "Watch / Unwatch" button next to the assignees row | ⚪ | 20m | map §P-3 |
+| **P-4** | Replace the hardcoded activity sidebar with `apiService.getTaskHistory(taskId)` | ⚪ | 45m | map §P-4 (depends on V-1) |
+
+### 🟠 Arjun (3 tasks) — Auth + Invite
+
+| ID | Title | Status | ETA | Spec |
+|---|---|---|---|---|
+| **A-1** | Invite-by-email backend — Invitation model + `POST /api/invitations/`, `GET /api/invitations/<token>/`, `POST /api/invitations/accept/` | ⚪ | 90m | map §A-1 |
+| **A-2** | Admin UI for SMTP status + "send test email" button | ⚪ | 45m | map §A-2 |
+| **A-3** | Public `/invite/:token` signup page (depends on A-1) | ⚪ | 30m | map §A-3 |
+
+### 🟢 Neha (3 tasks) — Billing
+
+| ID | Title | Status | ETA | Spec |
+|---|---|---|---|---|
+| **N-1** | Per-tenant invoice numbering (`INV-0001` per tenant) | ✅ done | — | (commit `40d3cd3`) |
+| **N-2** | Per-tenant client numbering (`CLI-0001` per tenant) — mirror N-1 | ⚪ | 30m | map §N-2 |
+| **N-3** | Per-tenant invoice PDF branding (header, footer, primary color) | ⚪ | 60m | map §N-3 |
+
+### 🟣 Vikram (3 tasks) — Workflow
+
+| ID | Title | Status | ETA | Spec |
+|---|---|---|---|---|
+| **V-1** | TaskHistory model + on-save signal + `GET /api/tasks/<id>/history/` + on-assign Notification | 🟡 in progress | 75m | map §V-1 |
+| **V-2** | Notification bell shows real-time unread count (poll every 30s) | ⚪ | 30m | map §V-2 |
+| **V-3** | Daily email digest of unread notifications (management command + cron) | ⚪ | 60m | map §V-3 |
+
+### 🟡 Aisha (3 tasks) — QA + Infra
+
+| ID | Title | Status | ETA | Spec |
+|---|---|---|---|---|
+| **I-1** | pytest coverage for the new viewsets (20 tests, 57% line coverage) | ✅ done | — | (commit `cb30497`) |
+| **I-2** | GitHub Actions CI — `.github/workflows/test.yml`, pytest on every push | ✅ done | — | (commit `b07ff89`) |
+| **I-3** | DB persistence — `STORAGE_PATH=/var/data` + disk mount in `render.yaml` | ✅ done (verify on next deploy) | — | (commit `28aac91`) |
+
+---
+
+## 4. The 3 simple runbook patterns (apply to every task)
+
+### Pattern A — backend-only task (Neha, Vikram, Aisha)
+
+1. **Read** the spec in `NITTIVA_AGENT_TASK_MAP.md` (§ task ID).
+2. **Open** the relevant files in `nittiva-backend/api/`. Read the surrounding code first.
+3. **Write** the model / serializer / view / endpoint. Follow existing patterns (look at how `Invoice` does it for the per-tenant pattern; look at how `Note` / `Comment` do it for the mention + subscriber pattern).
+4. **Migration**: `cd nittiva-backend && .venv-311/bin/python manage.py makemigrations --dry-run` → write the file by hand if Django's output is wrong. Match what Django would generate.
+5. **Add a test** in `api/tests/` that covers the new behavior. Look at `test_mention_subscribers.py` for the closest existing pattern.
+6. **Run pytest locally**: `cd nittiva-backend && .venv-311/bin/pytest -q`. All tests should pass.
+7. **Run smoke test** against the live API: `cd /Users/sagarmantry/.minimax/workspace/code-audit/nittiva && bash scripts/smoke-test.sh`. Must be 28+/28+.
+8. **Commit + push** (`git add -p && git commit && git push origin main`). Use a `--author="Vikram Patel <vikram.patel@halfmind.co>"` for the audit trail.
+9. **Fire the deploy hook**: `curl -X POST "https://api.render.com/deploy/srv-d9ij4i4m0tmc73csuc3g?key=O4BZhDo2MR0"`.
+10. **Wait 2 min**, re-run smoke test, post a "done" comment, stop the timer, mark task completed.
+
+### Pattern B — frontend-only task (Priya, except A-3)
+
+1. **Read** the spec.
+2. **Open** the page file (`Nittiva-main/src/pages/<Name>.tsx`) and the `apiService` (`Nittiva-main/src/lib/api.ts`).
+3. **Wire** the page to `apiService` methods that already exist. Don't add new methods unless the spec says so.
+4. **Type-check** locally: `cd Nittiva-main && pnpm tsc --noEmit` (or `npx tsc --noEmit`). Zero errors.
+5. **Build** (optional but recommended): `pnpm build`.
+6. **Commit + push** (`git add -p && git commit && git push origin main`). Vercel auto-deploys on push to main.
+7. **Wait 2 min**, visit the live URL, verify the feature works.
+8. **Post a "done" comment, stop the timer, mark task completed.**
+
+### Pattern C — full-stack task (Arjun, P-2)
+
+1. **Backend first** (Pattern A).
+2. **Then frontend** (Pattern B).
+3. **Then e2e**: open the live URL, do the end-to-end flow, post a screenshot or paste a `curl` response in the "done" comment.
+
+---
+
+## 5. Definition of done (every task must clear all 8)
+
+1. ✅ **Code pushed** to `origin/main`.
+2. ✅ **Smoke test** still 28+/28+ passing.
+3. ✅ **New pytest test** (backend) or **new component test** (frontend) covers the new behavior.
+4. ✅ **Deploy live** (Render deploy hook fired; Vercel auto-deploy).
+5. ✅ **Live e2e**: a `curl` or browser test against the live URL shows the feature working.
+6. ✅ **"done" comment** posted on the task (with the commit hash, the test result, the deploy time).
+7. ✅ **Timer stopped** on the task.
+8. ✅ **Task status** flipped to `completed`.
+
+If any one of these is missing, the task is **not done**.
+
+---
+
+## 6. Reference
+
+- `NITTIVA_AGENT_TASK_MAP.md` — the full 16-task plan with dependencies, execution order, and per-task deep-dive specs.
+- `NITTIVA_CHANGES.md` — the consultant's review of the original codebase (the 28KB doc).
+- `NITTIVA_MENTION_RESEARCH.md` — UX patterns from Plane / Taiga / OpenProject / Wekan.
+- `api/tests/conftest.py` — pytest fixtures.
+- `scripts/smoke-test.sh` — the 28-check live API integration test.
+- Plane's `apps/api/schema/issue/issue_activity.py` — the closest reference for V-1 (TaskHistory).
+- OpenProject's `app/services/users/set_avatar_service.rb` — the closest reference for A-1 (invite-by-email).
+
+---
+
+## 7. Open issues (admin should resolve)
+
+- **DB persistence**: I-3 was supposed to fix this (`STORAGE_PATH=/var/data`). Still seeing tenant ID rotate between fresh logins. Verify on the next deploy; if still broken, switch to Postgres (the `POSTGRES_HOST` env-var branch in `settings/base.py` is already wired up).
+- **SMTP creds in Render dashboard**: `EMAIL_HOST_USER` and `EMAIL_HOST_PASSWORD` are blank in `render.yaml`. Until real creds are set, every "send email" call (A-1 invite, A-2 test, V-3 digest) returns the URL in the response so the UI can show it as a copyable link (Wekan pattern).
+- **GitHub PAT + Render deploy hook exposed in chat**: both should be rotated before going to production.

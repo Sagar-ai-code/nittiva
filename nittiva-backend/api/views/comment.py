@@ -56,6 +56,19 @@ def _sync_mentions_and_side_effects(comment: Comment, actor):
         import logging
         logging.getLogger(__name__).exception("Mention/subscribe sync failed for comment %s", comment.id)
 
+    # V-1: also write a TaskHistory row when a comment is posted on a task.
+    # This is best-effort and runs in the same transaction as the comment
+    # create, so a failure here doesn't roll back the comment.
+    if comment.content_type == "task":
+        try:
+            from ..models import Task, TaskHistory
+            task = Task.objects.filter(id=comment.object_id).first()
+            if task:
+                TaskHistory.record_comment(task=task, actor=actor, comment=comment)
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception("TaskHistory write failed for comment %s", comment.id)
+
 
 class CommentViewSet(viewsets.ModelViewSet):
     """ViewSet for comment management."""

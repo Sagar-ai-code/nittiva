@@ -7,10 +7,12 @@ This module contains viewsets for task management.
 from django.db.models import Q
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import permissions, viewsets
+from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
+from rest_framework.response import Response
 
-from ..models import Task, TaskSubscriber
-from ..serializers import TaskSerializer, TaskSubscriberSerializer
+from ..models import Task, TaskSubscriber, TaskHistory
+from ..serializers import TaskSerializer, TaskSubscriberSerializer, TaskHistorySerializer
 from ..utils.tenant import get_current_tenant_id
 
 
@@ -63,6 +65,47 @@ class TaskViewSet(viewsets.ModelViewSet):
             raise ValidationError("Tenant not found.")
         # tenant_id is already set in serializer.create() method, so just save
         serializer.save()
+
+    def perform_update(self, serializer):
+        """On update, detect assignee changes and write a history row +
+        a Notification for the new assignee. Other field changes are
+        captured automatically by Task.save().
+        """
+        instance = serializer.instance
+        old_assignee_ids = set(instance.assignees.values_list("id", flat=True))
+        updated = serializer.save()
+        new_assignee_ids = set(updated.assignees.values_list("id", flat=True))
+
+        added = new_assignee_ids - old_assignee_ids
+        removed = old_assignee_ids - new_assignee_ids
+        actor = self.request.user if self.request.user.is_authenticated else None
+
+        if added or removed:
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            for user_id in added:
+                user = User.objects.filter(id=user_id).first()
+                if user:
+                    TaskHistory.record_assignee_change(
+                        task=updated, actor=actor, user=user, action="assigned"
+                    )
+            for user_id in removed:
+                user = User.objects.filter(id=user_id).first()
+                if user:
+                    TaskHistory.record_assignee_change(
+                        task=updated, actor=actor, user=user, action="unassigned"
+                    )
+
+    @action(detail=True, methods=["get"], url_path="history")
+    def history(self, request, pk=None):
+        """Return the activity log for this task.
+
+        `GET /api/tasks/<id>/history/` → 200 with a list of TaskHistory rows
+        (newest first). Powers the right sidebar in the task detail UI.
+        """
+        task = self.get_object()
+        rows = task.history.all().select_related("actor")[:200]
+        return Response(TaskHistorySerializer(rows, many=True).data)
 
 
 

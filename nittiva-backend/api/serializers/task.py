@@ -8,7 +8,7 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.db import transaction
 
-from ..models import Task, TaskAssignment, Project, TaskStatus, TaskPriority, TaskSubscriber
+from ..models import Task, TaskAssignment, Project, TaskStatus, TaskPriority, TaskSubscriber, TaskHistory
 from .user import UserSerializer
 from .task_status import TaskStatusSerializer, TaskPrioritySerializer
 
@@ -244,3 +244,26 @@ class TaskSubscriberSerializer(serializers.ModelSerializer):
                 f"tenant_id={validated_data.get('tenant_id')!r} "
                 f"({type(validated_data.get('tenant_id')).__name__})"
             ) from e
+
+
+class TaskHistorySerializer(serializers.ModelSerializer):
+    """Serializer for TaskHistory (the activity log).
+
+    `actor` is read-only expanded so the UI can show the actor's name/avatar.
+    `diff` is a free-form JSONField — the UI interprets it based on `verb`.
+    """
+
+    actor = UserSerializer(read_only=True)
+
+    class Meta:
+        model = TaskHistory
+        fields = [
+            "id",
+            "task",
+            "actor",
+            "actor_id",
+            "verb",
+            "diff",
+            "created_at",
+        ]
+        read_only_fields = fields
