@@ -270,11 +270,16 @@ def accept_invitation(request):
 
 
 @api_view(["GET"])
-@permission_classes([permissions.IsAuthenticated])
+@permission_classes([permissions.AllowAny])
 def get_invitation_by_token(request, token):
     """
-    Get invitation details by token (for accept page).
-    
+    Get invitation details by token (for the public accept page).
+
+    A-1 (Arjun) + A-3 (Arjun) — this is the only invitation endpoint
+    that allows unauthenticated access, so the public /invite/<token>
+    page can fetch the invitation details before the user registers.
+    Returns the same payload regardless of auth state.
+
     GET /api/invitations/{token}
     """
     try:
