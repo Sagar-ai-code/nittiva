@@ -1633,27 +1633,6 @@ async deleteNotification(id: string | number): Promise<ApiResponse<any>> {
     return this.makeRequest<TaskHistoryEntry[]>(`/tasks/${taskId}/history/`);
   }
 
-  /**
-   * A-1 follow-up — Time spent on a task, broken down by user.
-   * Powers the "Time spent" panel in the task detail (admin can see
-   * who spent how long on the task, and how long it took to close).
-   *
-   * Returns: { total_seconds, completed_in_seconds, by_user: [{user, total_seconds, session_count, ...}] }
-   */
-  async getTaskTimePerUser(taskId: number | string): Promise<ApiResponse<{
-    total_seconds: number;
-    completed_in_seconds: number | null;
-    by_user: Array<{
-      user: { id: number; email: string; name: string; role: string };
-      total_seconds: number;
-      session_count: number;
-      first_started_at: string;
-      last_ended_at: string | null;
-    }>;
-  }>> {
-    return this.makeRequest<any>(`/tasks/${taskId}/time_per_user/`);
-  }
-
   async getNoteMentions(noteId: string): Promise<ApiResponse<NoteMention[]>> {
     return this.makeRequest<NoteMention[]>(`/notes/${noteId}/mentions/`).catch(() => ({
       // Fallback: the server may not have the mentions sub-route yet; return empty.

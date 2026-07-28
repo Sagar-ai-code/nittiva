@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, useParams, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { ProjectProvider } from "./context/ProjectContext";   // ⬅️ add this
 import { TaskProvider } from "./context/TaskContext";
@@ -115,17 +115,6 @@ function App() {
                     </ProtectedRoute>
                   }
                 />
-                {/* A-3 (Arjun) — public /invite/:token route.
-                    Same component, but the token is in the path, not the
-                    query string. Cleaner URL to paste in an email. */}
-                <Route
-                  path="/invite/:token"
-                  element={
-                    <ProtectedRoute requireAuth={false}>
-                      <InviteAcceptFromPath />
-                    </ProtectedRoute>
-                  }
-                />
 
                 {/* Protected Routes */}
                 <Route
@@ -189,19 +178,3 @@ function App() {
 }
 
 export default App;
-
-// A-3 (Arjun) — Wraps AcceptInvitation and synthesizes a `?token=`
-// query string from the path param. Lets us reuse the same component
-// for both the legacy /accept-invitation?token=<t> URL and the
-// cleaner /invite/<token> URL that the A-1 picker generates.
-function InviteAcceptFromPath() {
-  const { token } = useParams<{ token: string }>();
-  if (!token) return <Navigate to="/" replace />;
-  // Use window.location to inject the token into the query string
-  // the existing AcceptInvitation already reads from.
-  const search = new URLSearchParams(window.location.search);
-  search.set("token", token);
-  return (
-    <Navigate to={`/accept-invitation?${search.toString()}`} replace />
-  );
-}
