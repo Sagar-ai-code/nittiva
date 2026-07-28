@@ -107,6 +107,92 @@ class TaskViewSet(viewsets.ModelViewSet):
         rows = task.history.all().select_related("actor")[:200]
         return Response(TaskHistorySerializer(rows, many=True).data)
 
+    @action(detail=True, methods=["get"], url_path="time_per_user")
+    def time_per_user(self, request, pk=None):
+        """Time spent on this task, broken down by user (admin visibility).
+
+        `GET /api/tasks/<id>/time_per_user/` → 200 with:
+
+          {
+            "total_seconds": <sum of all time logs>,
+            "completed_in_seconds": <task.created_at to last "updated" verb
+                                     that set status=completed, or null>,
+            "by_user": [
+              {
+                "user": {id, email, name, role},
+                "total_seconds": N,
+                "session_count": M,
+                "first_started_at": "...",
+                "last_ended_at": "..." | null
+              },
+              ...
+            ]
+          }
+
+        The user wanted to see who spent how much time on a task — this
+        is the answer. Sorted by total_seconds desc.
+        """
+        task = self.get_object()
+        from django.db.models import Sum, Count, Min, Max, Q
+        from ..models import TimeLog
+
+        # Aggregate time logs for this task, grouped by user
+        logs = (
+            TimeLog.objects
+            .filter(tenant_id=task.tenant_id, task_id=task.id)
+            .values(
+                "user_id",
+                "user__email",
+                "user__name",
+                "user__role",
+            )
+            .annotate(
+                total_seconds=Sum("duration_seconds"),
+                session_count=Count("id"),
+                first_started_at=Min("started_at"),
+                last_ended_at=Max("ended_at"),
+            )
+            .order_by("-total_seconds")
+        )
+
+        by_user = []
+        for row in logs:
+            by_user.append({
+                "user": {
+                    "id": row["user_id"],
+                    "email": row["user__email"],
+                    "name": row.get("user__name") or "",
+                    "role": row.get("user__role") or "",
+                },
+                "total_seconds": int(row["total_seconds"] or 0),
+                "session_count": row["session_count"],
+                "first_started_at": row["first_started_at"],
+                "last_ended_at": row["last_ended_at"],
+            })
+
+        total_seconds = sum(u["total_seconds"] for u in by_user)
+
+        # How long from task creation to completion?
+        completed_in_seconds = None
+        if task.status == "completed":
+            completion_row = (
+                task.history.filter(verb="updated")
+                .filter(diff__has_key="status")
+                .order_by("-created_at")
+                .first()
+            )
+            if completion_row and "status" in (completion_row.diff or {}):
+                from_, to_ = completion_row.diff["status"]
+                if to_ == "completed":
+                    delta = (completion_row.created_at - task.created_at).total_seconds()
+                    completed_in_seconds = max(0, int(delta))
+
+        return Response({
+            "total_seconds": total_seconds,
+            "completed_in_seconds": completed_in_seconds,
+            "by_user": by_user,
+        })
+
 
 
 class TaskSubscriberViewSet(viewsets.ModelViewSet):

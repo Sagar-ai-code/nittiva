@@ -15,6 +15,7 @@ import {
   CalendarDays,
   Flag,
   Timer,
+  UserPlus,
   Target,
   Tag,
   Link,
@@ -37,6 +38,7 @@ import { apiService } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Loader2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -86,6 +88,16 @@ const priorityIcons = {
  * JSONField with the structured details. Keep the strings tight and
  * human-friendly.
  */
+function formatDuration(seconds: number): string {
+  if (!seconds || seconds < 0) return "0s";
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+  if (hours > 0) return `${hours}h ${minutes}m ${secs}s`;
+  if (minutes > 0) return `${minutes}m ${secs}s`;
+  return `${secs}s`;
+}
+
 function renderHistorySummary(h: TaskHistoryEntry): React.ReactNode {
   const d = h.diff || {};
   const name = h.actor?.name || h.actor?.email?.split("@")[0] || "Someone";
@@ -151,6 +163,9 @@ export default function TaskDetail() {
   const [editValues, setEditValues] = useState<any>({});
   const [selectedTags, setSelectedTags] = useState<TaskTag[]>([]);
   const [showAssigneePopover, setShowAssigneePopover] = useState(false);
+  // A-1: assignee picker now has an email search box + "Invite <email>" row
+  const [assigneeSearch, setAssigneeSearch] = useState("");
+  const [inviting, setInviting] = useState(false);
   const [description, setDescription] = useState("");
   const [startDate, setStartDate] = useState("");
   const [timeEstimate, setTimeEstimate] = useState("");
@@ -169,6 +184,22 @@ export default function TaskDetail() {
   // live in this sidebar.
   const [history, setHistory] = useState<TaskHistoryEntry[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+
+  // A-1 follow-up: time spent on this task, broken down by user.
+  // Admin uses this to see who worked how long on a task and how
+  // long it took to close.
+  const [timePerUser, setTimePerUser] = useState<{
+    total_seconds: number;
+    completed_in_seconds: number | null;
+    by_user: Array<{
+      user: { id: number; email: string; name: string; role: string };
+      total_seconds: number;
+      session_count: number;
+      first_started_at: string;
+      last_ended_at: string | null;
+    }>;
+  } | null>(null);
+  const [loadingTimePerUser, setLoadingTimePerUser] = useState(false);
 
   const currentUserId = (user as any)?.id != null ? String((user as any).id) : null;
   const isCurrentUserSubscribed =
@@ -265,12 +296,32 @@ export default function TaskDetail() {
     }
   };
 
+  // A-1 follow-up: load time-per-user breakdown
+  const loadTimePerUser = async () => {
+    if (!task?.id) return;
+    setLoadingTimePerUser(true);
+    try {
+      const response = await apiService.getTaskTimePerUser(task.id);
+      if (response.success && response.data) {
+        setTimePerUser(response.data);
+      } else {
+        setTimePerUser(null);
+      }
+    } catch (error) {
+      console.error("Failed to load time-per-user:", error);
+      setTimePerUser(null);
+    } finally {
+      setLoadingTimePerUser(false);
+    }
+  };
+
   // Reload comments + subscribers + history when task changes
   useEffect(() => {
     if (task?.id) {
       loadComments();
       loadSubscribers();
       loadHistory();
+      loadTimePerUser();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task?.id]);
@@ -762,42 +813,143 @@ export default function TaskDetail() {
                       <Plus className="w-3 h-3" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-64 p-3 bg-dashboard-surface border-dashboard-border">
+                  <PopoverContent className="w-72 p-3 bg-dashboard-surface border-dashboard-border">
                     <div className="space-y-2">
-                      <h4 className="font-medium text-white mb-3">
+                      <h4 className="font-medium text-white mb-2">
                         Assign to:
                       </h4>
-                      <div className="space-y-2 max-h-48 overflow-y-auto">
-                        {users.map((user) => {
-                          const isSelected = (task.assigneeIds || []).includes(
-                            user.id,
-                          );
+                      <Input
+                        type="email"
+                        placeholder="Search by name or email…"
+                        value={assigneeSearch}
+                        onChange={(e) => setAssigneeSearch(e.target.value)}
+                        className="h-8 text-sm bg-dashboard-bg border-dashboard-border text-white"
+                      />
+                      <div className="space-y-1 max-h-48 overflow-y-auto mt-1">
+                        {(() => {
+                          const q = assigneeSearch.trim().toLowerCase();
+                          const filteredUsers = q
+                            ? users.filter(
+                                (u) =>
+                                  (u.name || "").toLowerCase().includes(q) ||
+                                  (u.email || "").toLowerCase().includes(q),
+                              )
+                            : users;
+                          if (filteredUsers.length === 0 && !q) {
+                            return (
+                              <div className="text-xs text-gray-500 px-2 py-3 text-center">
+                                No users in this workspace yet.
+                              </div>
+                            );
+                          }
                           return (
-                            <div
-                              key={user.id}
-                              className="flex items-center gap-3 p-2 rounded hover:bg-dashboard-bg transition-colors cursor-pointer"
-                              onClick={() => handleAssigneeToggle(user.id)}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={() => handleAssigneeToggle(user.id)}
-                                className="rounded border-dashboard-border bg-transparent"
-                              />
-                              <Avatar className="w-6 h-6">
-                                <AvatarFallback
-                                  className="text-xs"
-                                  style={{ backgroundColor: user.color }}
+                            <>
+                              {filteredUsers.map((user) => {
+                                const isSelected = (task.assigneeIds || []).includes(
+                                  user.id,
+                                );
+                                return (
+                                  <div
+                                    key={user.id}
+                                    className="flex items-center gap-3 p-2 rounded hover:bg-dashboard-bg transition-colors cursor-pointer"
+                                    onClick={() => handleAssigneeToggle(user.id)}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={isSelected}
+                                      onChange={() => handleAssigneeToggle(user.id)}
+                                      className="rounded border-dashboard-border bg-transparent"
+                                    />
+                                    <Avatar className="w-6 h-6">
+                                      <AvatarFallback
+                                        className="text-xs"
+                                        style={{ backgroundColor: user.color }}
+                                      >
+                                        {user.avatar}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <div className="flex flex-col min-w-0">
+                                      <span className="text-sm text-gray-300 truncate">
+                                        {user.name}
+                                      </span>
+                                      <span className="text-[10px] text-gray-500 truncate">
+                                        {user.email}
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                              {/* A-1: "Invite <email>" row when the search doesn't
+                                  match any existing user. */}
+                              {q && q.includes("@") && !users.some(
+                                (u) => (u.email || "").toLowerCase() === q,
+                              ) && (
+                                <div
+                                  className="flex items-center gap-2 p-2 rounded hover:bg-dashboard-bg transition-colors cursor-pointer border-t border-dashboard-border mt-1 pt-2"
+                                  onClick={async () => {
+                                    if (!task?.projectId && !task?.project) {
+                                      toast.error("Task has no project — can't invite.");
+                                      return;
+                                    }
+                                    const projectId = task.projectId ?? task.project;
+                                    setInviting(true);
+                                    try {
+                                      const res = await apiService.inviteUserToProject(
+                                        projectId,
+                                        assigneeSearch.trim(),
+                                        "member",
+                                      );
+                                      if (res.success) {
+                                        const inv = res.data?.invitation || res.data;
+                                        const token = inv?.token;
+                                        const inviteUrl = token
+                                          ? `${window.location.origin}/invite/${token}`
+                                          : null;
+                                        if (inviteUrl) {
+                                          try {
+                                            await navigator.clipboard.writeText(inviteUrl);
+                                            toast.success(
+                                              `Invitation created. Link copied to clipboard — share it with ${assigneeSearch.trim()}.`,
+                                              { duration: 8000 },
+                                            );
+                                          } catch {
+                                            toast.success(
+                                              `Invitation created. Share this link: ${inviteUrl}`,
+                                              { duration: 12000 },
+                                            );
+                                          }
+                                        } else {
+                                          toast.success(`Invitation created for ${assigneeSearch.trim()}.`);
+                                        }
+                                        setAssigneeSearch("");
+                                        setShowAssigneePopover(false);
+                                      } else {
+                                        toast.error(res.message || "Failed to create invitation");
+                                      }
+                                    } catch (err: any) {
+                                      toast.error(err?.message || "Failed to create invitation");
+                                    } finally {
+                                      setInviting(false);
+                                    }
+                                  }}
                                 >
-                                  {user.avatar}
-                                </AvatarFallback>
-                              </Avatar>
-                              <span className="text-sm text-gray-300">
-                                {user.name}
-                              </span>
-                            </div>
+                                  <UserPlus className="w-4 h-4 text-accent shrink-0" />
+                                  <div className="flex flex-col min-w-0">
+                                    <span className="text-sm text-accent truncate">
+                                      Invite "{assigneeSearch.trim()}"
+                                    </span>
+                                    <span className="text-[10px] text-gray-500 truncate">
+                                      Sends a signup link (OpenProject pattern)
+                                    </span>
+                                  </div>
+                                  {inviting && (
+                                    <Loader2 className="w-3 h-3 animate-spin text-gray-400 ml-auto" />
+                                  )}
+                                </div>
+                              )}
+                            </>
                           );
-                        })}
+                        })()}
                       </div>
                     </div>
                   </PopoverContent>
@@ -1205,6 +1357,87 @@ export default function TaskDetail() {
                     </div>
                   );
                 })
+              )}
+            </div>
+
+            <Separator className="bg-dashboard-border" />
+
+            {/* A-1 follow-up: time spent, broken down by user.
+                Admin can see who worked how long on this task and how
+                long it took from open to close (if completed). */}
+            <div className="space-y-3">
+              <h4 className="text-xs uppercase tracking-wider text-gray-500 flex items-center gap-1.5">
+                <Timer className="w-3 h-3" />
+                Time spent
+                {timePerUser && timePerUser.total_seconds > 0 && (
+                  <span className="text-gray-400 normal-case font-normal">
+                    ({formatDuration(timePerUser.total_seconds)})
+                  </span>
+                )}
+              </h4>
+              {loadingTimePerUser ? (
+                <div className="text-xs text-gray-500">Loading time…</div>
+              ) : !timePerUser || timePerUser.by_user.length === 0 ? (
+                <div className="text-xs text-gray-500">
+                  No time logged yet. Start a timer to track time on this task.
+                </div>
+              ) : (
+                <>
+                  {/* Per-user breakdown */}
+                  <div className="space-y-1.5">
+                    {timePerUser.by_user.map((row) => {
+                      const initials = (row.user.name || row.user.email || "?")
+                        .split(/\s+/)
+                        .map((p: string) => p[0])
+                        .filter(Boolean)
+                        .slice(0, 2)
+                        .join("")
+                        .toUpperCase() || "?";
+                      const pct = timePerUser.total_seconds > 0
+                        ? Math.round((row.total_seconds / timePerUser.total_seconds) * 100)
+                        : 0;
+                      return (
+                        <div key={row.user.id} className="space-y-1">
+                          <div className="flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <Avatar className="w-5 h-5 shrink-0">
+                                <AvatarFallback className="text-[10px] bg-accent/30 text-white">
+                                  {initials}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className="text-white truncate">
+                                {row.user.name || row.user.email}
+                              </span>
+                              <span className="text-gray-500">
+                                · {row.session_count}× session{row.session_count !== 1 ? "s" : ""}
+                              </span>
+                            </div>
+                            <span className="text-gray-300 font-mono shrink-0">
+                              {formatDuration(row.total_seconds)}
+                            </span>
+                          </div>
+                          {/* Bar showing share of total time */}
+                          <div className="h-1 bg-dashboard-border rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-accent rounded-full"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {/* If task is completed, show how long it took to close */}
+                  {timePerUser.completed_in_seconds !== null && (
+                    <div className="mt-3 pt-3 border-t border-dashboard-border text-xs text-gray-400">
+                      <span className="text-gray-500">Time to close:</span>{" "}
+                      <span className="text-white font-mono">
+                        {formatDuration(timePerUser.completed_in_seconds)}
+                      </span>
+                      <span className="text-gray-500"> (created → completed)</span>
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
