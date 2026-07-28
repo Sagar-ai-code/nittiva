@@ -49,7 +49,9 @@ def invite_user_to_project(request, project_id):
                 status_code=status.HTTP_404_NOT_FOUND,
             )
         
-        # Check if user is project admin or owner
+        # Check if user is project admin or owner. A-1 follow-up: also
+        # allow any project member (so managers can invite teammates from
+        # the assignee picker — not just admins).
         is_owner = project.owner_id == request.user.id
         is_admin = ProjectMember.objects.filter(
             project=project,
@@ -57,8 +59,18 @@ def invite_user_to_project(request, project_id):
             role=ProjectMember.Role.ADMIN,
             tenant_id=tenant_id
         ).exists()
-        
-        if not (is_owner or is_admin or request.user.is_staff):
+        is_member = ProjectMember.objects.filter(
+            project=project,
+            user=request.user,
+            tenant_id=tenant_id
+        ).exists()
+        is_manager = (
+            getattr(request.user, "is_staff", False)
+            or getattr(request.user, "is_superuser", False)
+            or getattr(request.user, "role", None) == "manager"
+        )
+
+        if not (is_owner or is_admin or is_member or is_manager):
             return error_response(
                 message="You don't have permission to invite users to this project.",
                 status_code=status.HTTP_403_FORBIDDEN,
