@@ -15,6 +15,8 @@ from ..views import (
     request_password_reset,
     reset_password,
     dashboard_statistics,
+    email_status,
+    email_status_test,
     UserViewSet,
     ClientViewSet,
     ProjectViewSet,
@@ -84,6 +86,10 @@ urlpatterns = [
     
     # Dashboard
     path('dashboard/statistics', dashboard_statistics, name='dashboard_statistics'),
+
+    # A-2 (Arjun): SMTP email status + send-test endpoint
+    path('system/email_status/', email_status, name='email_status'),
+    path('system/email_status/test/', email_status_test, name='email_status_test'),
     
     # Invitations
     path('projects/<int:project_id>/invite', invite_user_to_project, name='invite_user_to_project'),

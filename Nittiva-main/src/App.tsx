@@ -17,6 +17,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import AcceptInvitation from "./pages/AcceptInvitation";
 import AdminLogin from "./pages/admin/AdminLogin";
+import EmailSettings from "./pages/admin/EmailSettings";
 
 // Protected Pages
 import Index from "./pages/Index";
@@ -161,6 +162,7 @@ function App() {
                   <Route path="notes" element={<Notes />} />
                   <Route path="leave-requests" element={<LeaveRequests />} />
                   <Route path="notifications" element={<Notifications />} />
+                  <Route path="admin/email" element={<EmailSettings />} />
                   <Route path="admin/tenants" element={<TenantManagement />} />
                 </Route>
 

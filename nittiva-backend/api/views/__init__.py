@@ -11,6 +11,7 @@ from .project import ProjectViewSet
 from .task import TaskViewSet, TaskSubscriberViewSet
 from .password_reset import request_password_reset, reset_password
 from .dashboard import dashboard_statistics
+from .system import email_status, email_status_test
 from .invitation import invite_user_to_project, list_project_invitations, accept_invitation, get_invitation_by_token
 from .tenant import TenantViewSet
 from .goal import GoalViewSet
@@ -37,6 +38,8 @@ __all__ = [
     "request_password_reset",
     "reset_password",
     "dashboard_statistics",
+    "email_status",
+    "email_status_test",
     "UserViewSet",
     "ClientViewSet",
     "ProjectViewSet",

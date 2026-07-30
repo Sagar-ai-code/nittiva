@@ -1654,6 +1654,34 @@ async deleteNotification(id: string | number): Promise<ApiResponse<any>> {
     return this.makeRequest<any>(`/tasks/${taskId}/time_per_user/`);
   }
 
+  // ----------------------------------------------------------------
+  // A-2 (Arjun) — SMTP email status + send-test
+  // ----------------------------------------------------------------
+  async getEmailStatus(): Promise<ApiResponse<{
+    configured: boolean;
+    backend: "smtp" | "console";
+    host: string;
+    port: string;
+    use_tls: boolean;
+    from_email: string;
+    username_set: boolean;
+  }>> {
+    return this.makeRequest<any>("/system/email_status/");
+  }
+
+  async sendTestEmail(to?: string): Promise<ApiResponse<{
+    sent: boolean;
+    to: string;
+    backend: "smtp" | "console";
+    sent_count?: number;
+    error?: string;
+  }>> {
+    return this.makeRequest<any>("/system/email_status/test/", {
+      method: "POST",
+      body: JSON.stringify({ to }),
+    });
+  }
+
   async getNoteMentions(noteId: string): Promise<ApiResponse<NoteMention[]>> {
     return this.makeRequest<NoteMention[]>(`/notes/${noteId}/mentions/`).catch(() => ({
       // Fallback: the server may not have the mentions sub-route yet; return empty.

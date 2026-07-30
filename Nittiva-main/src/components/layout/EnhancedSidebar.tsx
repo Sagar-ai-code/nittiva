@@ -91,6 +91,7 @@ const sidebarItems = [
       { name: "Users", icon: Users, path: "/dashboard/users" },
       { name: "Leave Requests", icon: Plane, path: "/dashboard/leave-requests" },
       { name: "Notifications", icon: BellRing, path: "/dashboard/notifications" },
+      { name: "Email Settings", icon: BellRing, path: "/dashboard/admin/email" },
     ],
   },
 ];
