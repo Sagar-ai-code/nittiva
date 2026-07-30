@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { CheckCircle, XCircle, Mail, Clock, UserPlus } from "lucide-react";
+import { CheckCircle, XCircle, Mail, Clock, UserPlus, Loader2, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { apiService } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
@@ -12,11 +13,17 @@ export default function AcceptInvitation() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token");
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, login } = useAuth();
   const [loading, setLoading] = useState(true);
   const [accepting, setAccepting] = useState(false);
   const [invitation, setInvitation] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // A-3 (Arjun) — inline signup form state. Email is pre-filled from
+  // the invitation; the user just sets a password.
+  const [password, setPassword] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
+  const [signingUp, setSigningUp] = useState(false);
 
   useEffect(() => {
     if (!token) {
@@ -75,6 +82,66 @@ export default function AcceptInvitation() {
       toast.error(err.message || "Failed to accept invitation");
     } finally {
       setAccepting(false);
+    }
+  };
+
+  // A-3 (Arjun) — handle the inline signup + accept flow.
+  // Registers the new user (using the invitation's email), logs them
+  // in, then accepts the invitation so they're added to the project.
+  const handleSignupAndAccept = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!invitation || !token) return;
+    if (password.length < 8) {
+      toast.error("Password must be at least 8 characters.");
+      return;
+    }
+    if (password !== passwordConfirm) {
+      toast.error("Passwords don't match.");
+      return;
+    }
+    setSigningUp(true);
+    try {
+      // Derive first/last name from the email's local-part (best-effort).
+      const localPart = (invitation.email || "").split("@")[0] || "user";
+      const [firstName, ...rest] = localPart.split(/[._-]/);
+      const lastName = rest.join(" ") || "—";
+
+      // 1) Register the new user
+      const reg = await apiService.register({
+        email: invitation.email,
+        first_name: firstName,
+        last_name: lastName,
+        password,
+        company_id: (invitation as any).tenant_id || undefined,
+        company: invitation.project_name || "Nittiva",
+        role: "user",
+      } as any);
+      if (!reg.success) {
+        if ((reg.message || "").toLowerCase().includes("already")) {
+          toast.info("Account already exists. Logging you in…");
+          await login(invitation.email, password);
+        } else {
+          toast.error(reg.message || "Could not create account.");
+          return;
+        }
+      } else {
+        await login(invitation.email, password);
+      }
+
+      // 2) Accept the invitation (now that we're authed)
+      const acceptRes = await apiService.acceptInvitation(token);
+      if (acceptRes.success) {
+        toast.success("Welcome! You've been added to the project.");
+        setTimeout(() => {
+          navigate(`/dashboard/projects/${acceptRes.data.project.id}`);
+        }, 1500);
+      } else {
+        toast.error(acceptRes.message || "Account created but invitation accept failed.");
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Signup failed.");
+    } finally {
+      setSigningUp(false);
     }
   };
 
@@ -176,25 +243,80 @@ export default function AcceptInvitation() {
             </div>
 
             {canAccept && (
-              <div className="pt-4 space-y-2">
+              <div className="pt-4 space-y-3">
                 {!isAuthenticated ? (
-                  <>
-                    <p className="text-sm text-gray-400 text-center">
-                      Please login or register to accept this invitation
+                  // A-3: inline signup form (email pre-filled, password
+                  // + confirm). Replaces the "Login or Register" buttons
+                  // with a single form so the invitee can join in one
+                  // step without leaving the page.
+                  <form onSubmit={handleSignupAndAccept} className="space-y-3">
+                    <p className="text-sm text-gray-400">
+                      Set a password to join{" "}
+                      <span className="text-white font-medium">{invitation.project_name}</span>:
                     </p>
-                    <div className="flex gap-2">
-                      <Link to={`/login?redirect=/accept-invitation?token=${token}`} className="flex-1">
-                        <Button className="w-full bg-accent text-black hover:bg-accent/80">
-                          Login
-                        </Button>
-                      </Link>
-                      <Link to={`/register?token=${token}`} className="flex-1">
-                        <Button variant="outline" className="w-full border-dashboard-border">
-                          Register
-                        </Button>
+                    <div className="space-y-1">
+                      <label className="text-xs text-gray-500 uppercase tracking-wider">
+                        Email
+                      </label>
+                      <Input
+                        type="email"
+                        value={invitation.email}
+                        readOnly
+                        className="bg-dashboard-bg border-dashboard-border text-white opacity-70 cursor-not-allowed"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs text-gray-500 uppercase tracking-wider">
+                        Password
+                      </label>
+                      <Input
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="At least 8 characters"
+                        className="bg-dashboard-bg border-dashboard-border text-white"
+                        disabled={signingUp}
+                        autoFocus
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs text-gray-500 uppercase tracking-wider">
+                        Confirm password
+                      </label>
+                      <Input
+                        type="password"
+                        value={passwordConfirm}
+                        onChange={(e) => setPasswordConfirm(e.target.value)}
+                        className="bg-dashboard-bg border-dashboard-border text-white"
+                        disabled={signingUp}
+                      />
+                    </div>
+                    <Button
+                      type="submit"
+                      disabled={signingUp || password.length < 8}
+                      className="w-full bg-accent text-black hover:bg-accent/80"
+                    >
+                      {signingUp ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Joining…
+                        </>
+                      ) : (
+                        <>
+                          <KeyRound className="w-4 h-4 mr-2" />
+                          Join {invitation.project_name}
+                        </>
+                      )}
+                    </Button>
+                    <div className="text-center">
+                      <Link
+                        to={`/login?redirect=/accept-invitation?token=${token}`}
+                        className="text-xs text-gray-500 hover:text-gray-300"
+                      >
+                        Already have an account? Log in
                       </Link>
                     </div>
-                  </>
+                  </form>
                 ) : (
                   <>
                     {user?.email.toLowerCase() !== invitation.email.toLowerCase() && (
